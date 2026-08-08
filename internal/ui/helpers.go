@@ -153,17 +153,22 @@ func injectScrollbar(rendered, borderChar, thumbChar string, offset, total, inne
 	return strings.Join(lines, "\n")
 }
 
-// connectPaneTop replaces the top-left and top-right rounded corners of a
-// bordered pane with T-junctions so the pane visually connects to the status
-// bar border directly above it.
-func connectPaneTop(rendered string) string {
+// connectPaneCorners replaces a bordered pane's top-left and/or top-right
+// rounded corner with a T-junction so the pane visually connects to the status
+// bar border directly above it. Side-by-side panes pass only their outer
+// corners, leaving the inner ones to butt against each other.
+func connectPaneCorners(rendered string, left, right bool) string {
 	lines := strings.SplitN(rendered, "\n", 2)
 	if len(lines) == 0 {
 		return rendered
 	}
-	lines[0] = strings.Replace(lines[0], "╭", "├", 1)
-	if idx := strings.LastIndex(lines[0], "╮"); idx >= 0 {
-		lines[0] = lines[0][:idx] + "┤" + lines[0][idx+len("╮"):]
+	if left {
+		lines[0] = strings.Replace(lines[0], "╭", "├", 1)
+	}
+	if right {
+		if idx := strings.LastIndex(lines[0], "╮"); idx >= 0 {
+			lines[0] = lines[0][:idx] + "┤" + lines[0][idx+len("╮"):]
+		}
 	}
 	return strings.Join(lines, "\n")
 }

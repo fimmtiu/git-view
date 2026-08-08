@@ -23,6 +23,14 @@ type Theme struct {
 	DeletedMsgStyle lipgloss.Style
 	RenamedMsgStyle lipgloss.Style
 	LineSelectStyle lipgloss.Style
+
+	// Commit selector styles.
+	SelectedStyle   lipgloss.Style
+	RangeStyle      lipgloss.Style
+	SeparatorStyle  lipgloss.Style
+	CommitHashStyle lipgloss.Style
+	StatAddStyle    lipgloss.Style
+	StatRemoveStyle lipgloss.Style
 }
 
 // Adaptive colour values, light background first. The light values are tuned
@@ -32,7 +40,11 @@ var (
 	colourBorder     = lipgloss.AdaptiveColor{Light: "25", Dark: "24"}
 	colourAccent     = lipgloss.AdaptiveColor{Light: "30", Dark: "37"}
 	colourOnAccent   = lipgloss.AdaptiveColor{Light: "255", Dark: "16"}
+	colourPrimary    = lipgloss.AdaptiveColor{Light: "25", Dark: "25"}
+	colourOnPrimary  = lipgloss.AdaptiveColor{Light: "255", Dark: "255"}
 	colourMuted      = lipgloss.AdaptiveColor{Light: "244", Dark: "245"}
+	colourDimGrey    = lipgloss.AdaptiveColor{Light: "102", Dark: "240"}
+	colourSuccess    = lipgloss.AdaptiveColor{Light: "28", Dark: "77"}
 	colourSubtle     = lipgloss.AdaptiveColor{Light: "243", Dark: "240"}
 	colourDanger     = lipgloss.AdaptiveColor{Light: "124", Dark: "167"}
 	colourHunkHeader = lipgloss.AdaptiveColor{Light: "189", Dark: "24"}
@@ -69,4 +81,14 @@ var theme = Theme{
 	LineSelectStyle: lipgloss.NewStyle().
 		Background(colourAccent).
 		Foreground(colourOnAccent),
+	SelectedStyle: lipgloss.NewStyle().
+		Background(colourPrimary).
+		Foreground(colourOnPrimary),
+	RangeStyle: lipgloss.NewStyle().
+		Background(colourAccent).
+		Foreground(colourOnAccent),
+	SeparatorStyle:  lipgloss.NewStyle().Foreground(colourDimGrey),
+	CommitHashStyle: lipgloss.NewStyle().Bold(true).Foreground(colourMuted),
+	StatAddStyle:    lipgloss.NewStyle().Foreground(colourSuccess),
+	StatRemoveStyle: lipgloss.NewStyle().Foreground(colourDanger),
 }

@@ -1,13 +1,7 @@
 // Command git-view is a full-screen terminal viewer for git diffs.
 //
-// Usage:
-//
-//	git-view [<rev>...]
-//
-// Arguments are passed straight through to `git diff`, so the usual forms all
-// work: no arguments shows the working tree, "HEAD~3" shows everything since
-// that commit, "main..HEAD" shows a range, and "abc123^!" shows a single
-// commit. Flags such as --cached are passed through too.
+// It opens on a commit selector: pick a commit, or extend a range with
+// Shift+arrows, then press Tab or Enter to read the diff.
 package main
 
 import (
@@ -16,7 +10,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/fimmtiu/git-view/internal/diff"
 	"github.com/fimmtiu/git-view/internal/git"
 	"github.com/fimmtiu/git-view/internal/ui"
 )
@@ -24,14 +17,10 @@ import (
 const usage = `git-view — a full-screen terminal viewer for git diffs
 
 Usage:
-  git-view [<rev>...]
+  git-view
 
-Revision arguments are passed through to 'git diff':
-  git-view                    changes in the working tree
-  git-view --cached           staged changes
-  git-view HEAD~3             everything since HEAD~3
-  git-view main..HEAD         a commit range
-  git-view abc123^!           a single commit
+Run it inside a git repository. It opens on a commit selector; pick a commit
+or a range and press Tab or Enter to view the diff.
 
 Environment:
   GIT_VIEW_EDITOR, VISUAL, EDITOR   editor launched by the E key
@@ -44,15 +33,15 @@ func main() {
 	}
 }
 
-// run resolves the repository, fetches and parses the diff, and hands control
-// to the TUI. It returns an error rather than exiting so main owns the exit
-// path.
+// run resolves the repository and hands control to the TUI. It returns an error
+// rather than exiting so main owns the exit path.
 func run(args []string) error {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Print(usage)
-			return nil
+	if len(args) > 0 {
+		fmt.Print(usage)
+		if args[0] != "-h" && args[0] != "--help" {
+			return fmt.Errorf("unexpected argument %q", args[0])
 		}
+		return nil
 	}
 
 	cwd, err := os.Getwd()
@@ -64,17 +53,7 @@ func run(args []string) error {
 		return err
 	}
 
-	raw, err := git.Diff(repoRoot, args)
-	if err != nil {
-		return err
-	}
-	files := diff.Parse(raw)
-	if len(files) == 0 {
-		fmt.Println("No changes to show.")
-		return nil
-	}
-
-	model := ui.NewModel(files, repoRoot, git.DescribeRevs(repoRoot, args))
+	model := ui.NewModel(repoRoot, git.RepoLabel(repoRoot))
 	_, err = tea.NewProgram(model, tea.WithAltScreen()).Run()
 	return err
 }
