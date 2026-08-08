@@ -52,10 +52,44 @@ func TestResolve_KnownGUIEditor(t *testing.T) {
 }
 
 func TestFromSpec_KeepsUserFlagsAndAddsGoto(t *testing.T) {
-	ed := fromSpec("code --wait")
+	ed := fromSpec("code --new-window")
 
-	if got := strings.Join(ed.Argv, " "); got != "code --wait --goto" {
-		t.Errorf("Argv = %q, want %q", got, "code --wait --goto")
+	if got := strings.Join(ed.Argv, " "); got != "code --new-window --goto" {
+		t.Errorf("Argv = %q, want %q", got, "code --new-window --goto")
+	}
+}
+
+func TestFromSpec_DropsWait(t *testing.T) {
+	cases := map[string]string{
+		"code --wait":                "code --goto",
+		"code --wait --new-window":   "code --new-window --goto",
+		"cursor --goto --wait":       "cursor --goto",
+		"vim --wait":                 "vim",
+		"myeditor --wait --flag":     "myeditor --flag",
+		"/usr/local/bin/code --wait": "/usr/local/bin/code --goto",
+	}
+
+	for spec, want := range cases {
+		if got := strings.Join(fromSpec(spec).Argv, " "); got != want {
+			t.Errorf("fromSpec(%q) = %q, want %q", spec, got, want)
+		}
+	}
+}
+
+func TestCommand_DropsWaitBeforeLaunching(t *testing.T) {
+	t.Setenv("GIT_VIEW_EDITOR", "code --wait")
+
+	ed, ok := Resolve()
+	if !ok {
+		t.Fatal("expected an editor")
+	}
+	// --wait would keep a detached GUI editor from ever returning.
+	got := strings.Join(ed.Command("/tmp/repo", "a.go", 3).Args, " ")
+	if strings.Contains(got, "--wait") {
+		t.Errorf("command still carries --wait: %q", got)
+	}
+	if want := "code --goto a.go:3"; got != want {
+		t.Errorf("command = %q, want %q", got, want)
 	}
 }
 

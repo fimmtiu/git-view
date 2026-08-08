@@ -67,11 +67,10 @@ func Resolve() (Editor, bool) {
 // fromSpec builds an Editor from a command that may carry arguments. Unknown
 // editors are assumed to be terminal ones with no line-navigation syntax.
 func fromSpec(spec string) Editor {
-	fields := strings.Fields(spec)
+	fields := dropWait(strings.Fields(spec))
 	base := baseName(fields[0])
 	if p, ok := profiles[base]; ok {
-		// Discarding the profile's Argv keeps "code --wait" from becoming
-		// "code --goto --wait".
+		// The profile's own Argv is discarded so the user's flags survive.
 		p.Argv = fields
 		if p.lineArg != nil && !hasGotoFlag(fields, base) {
 			p.Argv = append(p.Argv, gotoFlagFor(base)...)
@@ -79,6 +78,18 @@ func fromSpec(spec string) Editor {
 		return p
 	}
 	return Editor{Argv: fields}
+}
+
+// dropWait strips --wait: a GUI editor told to wait never returns to the caller,
+// and a terminal editor already holds the tty for as long as it runs.
+func dropWait(fields []string) []string {
+	kept := fields[:0]
+	for _, f := range fields {
+		if f != "--wait" {
+			kept = append(kept, f)
+		}
+	}
+	return kept
 }
 
 func hasGotoFlag(fields []string, base string) bool {
