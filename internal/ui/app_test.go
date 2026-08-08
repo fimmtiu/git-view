@@ -11,8 +11,6 @@ import (
 	"github.com/fimmtiu/git-view/internal/git"
 )
 
-// onSelector returns a Model sized to the given terminal and loaded with n
-// commits, sitting on the commit selector screen.
 func onSelector(t *testing.T, n, width, height int) Model {
 	t.Helper()
 	m, _ := NewModel("/tmp/repo", "📁 myrepo ⎇  main").
@@ -21,7 +19,6 @@ func onSelector(t *testing.T, n, width, height int) Model {
 	return loaded.(Model)
 }
 
-// onViewer returns a Model showing files in the diff viewer.
 func onViewer(t *testing.T, files []diff.File, width, height int) Model {
 	t.Helper()
 	m := onSelector(t, 5, width, height)
@@ -29,7 +26,6 @@ func onViewer(t *testing.T, files []diff.File, width, height int) Model {
 	return opened.(Model)
 }
 
-// send delivers a key to the model and returns the updated model and command.
 func send(t *testing.T, m Model, k string) (Model, tea.Cmd) {
 	t.Helper()
 	updated, cmd := m.Update(key(k))
@@ -43,8 +39,8 @@ func TestInit_LoadsTheCommitList(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("Init should start the commit-list fetch")
 	}
-	// /tmp/repo is not a repository, so the fetch reports an error rather than
-	// hanging or panicking.
+	// /tmp/repo is not a repository, so the fetch must report an error rather
+	// than hang or panic.
 	msg, ok := cmd().(commitListMsg)
 	if !ok {
 		t.Fatalf("expected a commitListMsg, got %T", cmd())
@@ -213,7 +209,7 @@ func TestView_ViewerStatusBarNamesARange(t *testing.T) {
 	}
 }
 
-// statusLine returns row n of a rendered view with its border characters trimmed.
+// Row n of a rendered view, with its border characters trimmed.
 func statusLine(view string, n int) string {
 	return strings.Trim(stripAnsi(strings.Split(view, "\n")[n]), "│ ")
 }
@@ -397,8 +393,7 @@ func TestKeys_SelectorStatPreviewIsCached(t *testing.T) {
 		t.Fatal("expected a stat fetch")
 	}
 
-	// Once the stat for that commit has arrived, moving back and forth should
-	// not refetch what is already cached.
+	// Once that commit's stat has arrived, returning to it must not refetch.
 	msg := showStatMsg{hash: moved.selector.rows[1].commit.Hash, output: "stat output"}
 	cached, _ := moved.Update(msg)
 	if _, cmd := send(t, cached.(Model), "down"); cmd == nil {
@@ -445,14 +440,13 @@ func TestKeys_EditIsANoOpInTheViewerWithoutAFile(t *testing.T) {
 }
 
 func TestKeys_GitHubOnlyAppliesInTheViewer(t *testing.T) {
-	// On the selector there is no file, so g falls through to the selector's
-	// own key handling, which ignores it.
+	// With no file on the selector, g falls through to key handling that ignores it.
 	if _, cmd := send(t, onSelector(t, 5, 80, 24), "g"); cmd != nil {
 		t.Error("g should do nothing on the commit selector")
 	}
 
-	// /tmp/repo is not a git repository, so the URL lookup fails and the error
-	// must surface rather than being swallowed.
+	// /tmp/repo is not a repository, so the lookup fails and the error must
+	// surface rather than be swallowed.
 	_, cmd := send(t, onViewer(t, sampleFiles(), 80, 24), "g")
 	if cmd == nil {
 		t.Fatal("g should return a status command in the viewer")
@@ -536,8 +530,7 @@ func TestCommitRangeLabel(t *testing.T) {
 	if got := commitRangeLabel(a, b); got != "Commits abcd to 9876" {
 		t.Errorf("range label = %q, want %q", got, "Commits abcd to 9876")
 	}
-	// Viewing the uncommitted pseudo-commit alone names it, but inside a range
-	// it keeps the "????" hash the commit list shows it under.
+	// Named outright when alone, but keeping its hash inside a range.
 	uncommitted := git.CommitEntry{Hash: git.UncommittedHash}
 	if got := commitRangeLabel(uncommitted, uncommitted); got != "Uncommitted changes" {
 		t.Errorf("uncommitted label = %q, want %q", got, "Uncommitted changes")

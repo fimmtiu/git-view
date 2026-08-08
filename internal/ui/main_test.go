@@ -8,9 +8,8 @@ import (
 	"github.com/muesli/termenv"
 )
 
-// TestMain forces a colour profile for the whole package. Without a tty
-// lipgloss degrades to the Ascii profile and every style renders as plain
-// text, which would silently make the styling assertions below vacuous.
+// Without a tty lipgloss degrades to the Ascii profile and renders every style
+// as plain text, silently making the styling assertions vacuous.
 func TestMain(m *testing.M) {
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	os.Exit(m.Run())

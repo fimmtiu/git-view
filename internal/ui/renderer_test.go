@@ -66,7 +66,7 @@ func TestRenderDiff_LineNumbers(t *testing.T) {
 	}
 
 	lines := strings.Split(renderDiff(files, 60, nil).text, "\n")
-	// lines[0] blank, [1] filename, [2] hunk header, [3..] content.
+	// [0] blank, [1] filename, [2] hunk header, [3..] content.
 	plain := func(i int) string { return stripAnsi(lines[i]) }
 
 	if !strings.HasPrefix(plain(3), "10 ") {
@@ -102,7 +102,7 @@ func TestRenderDiff_LineNumberColumnWidth(t *testing.T) {
 	}
 
 	lines := strings.Split(renderDiff(files, 60, nil).text, "\n")
-	// Max line number is 998+3 = 1001, so four columns.
+	// 998+3 = 1001, so four columns.
 	if got := stripAnsi(lines[3]); !strings.HasPrefix(got, " 998 ") {
 		t.Errorf("expected four-column line number, got %q", got)
 	}
@@ -154,8 +154,8 @@ func TestRenderDiff_BackgroundsSpanPaneWidth(t *testing.T) {
 
 	const paneWidth = 40
 	lines := strings.Split(renderDiff(files, paneWidth, nil).text, "\n")
-	// Hunk header (2), removed (3), added (4) all carry a background and must
-	// fill the pane so the colour does not stop at the end of the text.
+	// Header, removed, and added lines carry a background, which must not stop
+	// at the end of the text.
 	for _, i := range []int{2, 3, 4} {
 		if got := lipgloss.Width(lines[i]); got != paneWidth {
 			t.Errorf("line %d width = %d, want %d (%q)", i, got, paneWidth, stripAnsi(lines[i]))
@@ -182,7 +182,6 @@ func TestRenderDiff_WrapsLongLinesToFullWidth(t *testing.T) {
 	rd := renderDiff(files, paneWidth, nil)
 	lines := strings.Split(rd.text, "\n")
 
-	// The single added line wraps across several visual lines, each padded.
 	wrapped := lines[3:]
 	if len(wrapped) < 3 {
 		t.Fatalf("expected the long line to wrap, got %d visual lines", len(wrapped))
@@ -192,17 +191,15 @@ func TestRenderDiff_WrapsLongLinesToFullWidth(t *testing.T) {
 			t.Errorf("wrapped line %d width = %d, want %d", i, got, paneWidth)
 		}
 	}
-	// Metadata must count every visual line, or the line-select cursor drifts.
+	// Metadata must count every visual line, or the selection cursor drifts.
 	if len(rd.lineMeta) != len(lines) {
 		t.Errorf("lineMeta has %d entries, rendered text has %d lines", len(rd.lineMeta), len(lines))
 	}
 }
 
-// TestRenderDiff_EveryLineFitsThePane pins the invariant the viewer depends on:
-// one line of rendered text is exactly one screen row. If a line were left
-// wider than the pane, lipgloss would wrap it at render time, so the pane would
-// show fewer logical lines than it accounts for — pushing content off the bottom
-// and misplacing the line-select cursor.
+// The viewer's core invariant: one line of text is exactly one screen row. A line
+// left wider than the pane would wrap at render time, pushing content off the
+// bottom and misplacing the line-select cursor.
 func TestRenderDiff_EveryLineFitsThePane(t *testing.T) {
 	long := strings.Repeat("x", 200)
 	files := []diff.File{
@@ -254,8 +251,7 @@ func TestRenderDiff_WrappedContextLineHasNoBackground(t *testing.T) {
 		},
 	}
 
-	// Context lines go through the same wrapping path as added/removed lines,
-	// but must not pick up a background colour along the way.
+	// Context lines share the wrapping path but must gain no background.
 	for _, line := range strings.Split(renderDiff(files, 20, nil).text, "\n")[3:] {
 		if strings.Contains(line, "\x1b") {
 			t.Errorf("context line should carry no styling, got %q", line)

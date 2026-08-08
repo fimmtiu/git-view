@@ -175,7 +175,7 @@ index abc1234..def5678 100644
 }
 
 func TestParse_RenamedFileFromDiffHeader(t *testing.T) {
-	// Rename detected via similarity index + different a/b paths, no explicit rename lines
+	// Detected from the similarity index and differing a/b paths alone.
 	raw := `diff --git a/old_name.go b/new_name.go
 similarity index 100%
 `
@@ -317,10 +317,7 @@ index abc1234..def5678 100644
 	}
 }
 
-// TestParseFileSection_EmptyInput verifies that parseFileSection does not panic
-// on empty or blank input.
 func TestParseFileSection_EmptyInput(t *testing.T) {
-	// Empty string should not panic and should return a zero-value File.
 	f := parseFileSection("")
 	if f.Name != "" {
 		t.Errorf("expected empty name, got %q", f.Name)
@@ -331,8 +328,7 @@ func TestParseFileSection_EmptyInput(t *testing.T) {
 }
 
 func TestParse_SkipsEmptySections(t *testing.T) {
-	// Simulate a diff where one section produces an empty File (blank section
-	// sandwiched between two valid ones). Parse should silently drop it.
+	// A blank section between two valid ones should be dropped silently.
 	raw := `diff --git a/first.go b/first.go
 index abc1234..def5678 100644
 --- a/first.go

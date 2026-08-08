@@ -1,7 +1,4 @@
 // Command git-view is a full-screen terminal viewer for git diffs.
-//
-// It opens on a commit selector: pick a commit, or extend a range with
-// Shift+arrows, then press Tab or Enter to read the diff.
 package main
 
 import (
@@ -33,8 +30,7 @@ func main() {
 	}
 }
 
-// run resolves the repository and hands control to the TUI. It returns an error
-// rather than exiting so main owns the exit path.
+// Returns errors rather than exiting so main owns the exit path.
 func run(args []string) error {
 	if len(args) > 0 {
 		fmt.Print(usage)

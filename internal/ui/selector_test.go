@@ -9,8 +9,6 @@ import (
 	"github.com/fimmtiu/git-view/internal/git"
 )
 
-// newSelector returns a selector holding n commits, with no fork point and a
-// clean working tree unless overridden.
 func newSelector(n, width, listHeight int) *selector {
 	s := &selector{}
 	s.setSize(width, listHeight)
@@ -62,7 +60,7 @@ func TestBuildCommitRows_SeparatorAboveTheForkPoint(t *testing.T) {
 }
 
 func TestBuildCommitRows_NoLeadingSeparator(t *testing.T) {
-	// The branch is at its fork point, so there is nothing newer to divide off.
+	// At its fork point, so there is nothing newer to divide off.
 	rows := buildCommitRows(sampleCommits(3), 0, false)
 
 	if len(rows) != 3 {
@@ -74,8 +72,7 @@ func TestBuildCommitRows_NoLeadingSeparator(t *testing.T) {
 }
 
 func TestBuildCommitRows_SeparatorDividesUncommittedFromForkPoint(t *testing.T) {
-	// HEAD is the fork point, but uncommitted changes sit above it, so the
-	// separator still has something to divide.
+	// HEAD is the fork point, but the uncommitted row above it still needs dividing.
 	rows := buildCommitRows(sampleCommits(3), 0, true)
 
 	if !rows[1].separator {
@@ -184,7 +181,6 @@ func TestSelector_SelectedCountIgnoresTheSeparator(t *testing.T) {
 	s.setSize(80, 10)
 	s.setRows(buildCommitRows(sampleCommits(4), 2, false))
 
-	// Span the whole list, separator included.
 	s.extendRange(10, 1)
 	if got := s.selectedCount(); got != 4 {
 		t.Errorf("selectedCount = %d, want 4 commits (the separator is not one)", got)
@@ -274,7 +270,7 @@ func TestSelector_SelectedRangeIsOldestToNewest(t *testing.T) {
 	if !ok {
 		t.Fatal("expected a selection")
 	}
-	// Rows are newest first, so the newest commit is at the lowest index.
+	// Rows are newest first.
 	if end.Hash != s.rows[0].commit.Hash {
 		t.Errorf("end = %q, want the newest commit %q", end.Hash, s.rows[0].commit.Hash)
 	}
@@ -367,8 +363,7 @@ func TestSelector_RenderHighlightsCursorAndRange(t *testing.T) {
 		t.Fatal("extending the range should change the rendering")
 	}
 
-	// The cursor row and the other rows in the range use different styles, so
-	// the user can see which end moves.
+	// Styled differently so the user can see which end moves.
 	lines := strings.Split(ranged, "\n")
 	cursorRow, rangeRow := lines[1+s.cursor], lines[1+s.anchor]
 	if cursorRow == rangeRow {
@@ -421,8 +416,7 @@ func TestRenderStatContent_ColourisesBars(t *testing.T) {
 	if !strings.Contains(out, "\x1b") {
 		t.Fatal("expected styled output")
 	}
-	// The '+' and '-' runs get different colours, so they cannot share a
-	// single escape sequence with the surrounding text.
+	// Differently coloured runs cannot share one escape sequence.
 	if strings.Count(out, "\x1b[") < 4 {
 		t.Errorf("expected the +/- runs to be styled separately, got %q", out)
 	}

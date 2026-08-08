@@ -7,7 +7,6 @@ import (
 	"github.com/fimmtiu/git-view/internal/git"
 )
 
-// sampleFiles returns a small two-file diff used across the UI tests.
 func sampleFiles() []diff.File {
 	return []diff.File{
 		{
@@ -44,8 +43,7 @@ func sampleFiles() []diff.File {
 	}
 }
 
-// largeSampleFiles returns a diff long enough to require scrolling at any
-// reasonable pane height.
+// Long enough to require scrolling at any reasonable pane height.
 func largeSampleFiles() []diff.File {
 	var lines []diff.Line
 	for range 30 {
@@ -65,8 +63,7 @@ func largeSampleFiles() []diff.File {
 	}
 }
 
-// sampleCommits returns n commits, newest first, with predictable hashes:
-// commit i has hash "c<i>" padded to 8 characters.
+// Newest first, with predictable hashes: commit i is "c<i>…<i>".
 func sampleCommits(n int) []git.CommitEntry {
 	commits := make([]git.CommitEntry, n)
 	for i := range n {

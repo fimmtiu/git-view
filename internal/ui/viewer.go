@@ -10,42 +10,36 @@ import (
 	"github.com/fimmtiu/git-view/internal/diff"
 )
 
-// ansiEscapeRe matches ANSI escape sequences (CSI and OSC).
+// CSI and OSC sequences.
 var ansiEscapeRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x1b\\|\x1b\][^\x07]*\x07`)
 
-// stripAnsi removes ANSI escape sequences from a string.
 func stripAnsi(s string) string {
 	return ansiEscapeRe.ReplaceAllString(s, "")
 }
 
-// viewer holds the scrollable diff pane: the rendered text, the scroll offset,
-// collapse state, and the line-select cursor. The app model owns the status bar
-// and passes in only the content-pane dimensions, so the viewer has no copy of
-// the full terminal size.
+// viewer is the scrollable diff pane. The app model owns the status bar and
+// passes in content-pane dimensions only, so the viewer never sees the full
+// terminal size.
 type viewer struct {
-	text       string // pre-rendered diff content
-	fileStarts []int  // line offset where each file begins
+	text       string
+	fileStarts []int
 	fileNames  []string
-	lineMeta   []diffLineMeta // per-line selectability and file ownership
-	offset     int            // first visible line in the viewer pane
+	lineMeta   []diffLineMeta
+	offset     int // first visible line
 
-	// Collapse state: stored so we can re-render when the user toggles a file.
+	// Kept so a collapse toggle can re-render.
 	files     []diff.File
 	collapsed []bool
 
-	// Content-pane dimensions (excluding border and chrome). Set by the app
-	// model on creation and resize via setSize.
 	paneWidth  int
 	paneHeight int
 
-	// Line select mode state.
-	lineSelectMode bool // true when the user is selecting individual lines
-	selectedLine   int  // index of the currently selected line in the rendered text
-	frozenFileIdx  int  // file index frozen on exit from line select; -1 when not frozen
+	lineSelectMode bool
+	selectedLine   int
+	frozenFileIdx  int // -1 when not frozen; see exitLineSelect
 }
 
-// newViewer creates a viewer from parsed diff files. paneWidth and paneHeight
-// are the dimensions of the content area only.
+// paneWidth and paneHeight cover the content area only.
 func newViewer(files []diff.File, paneWidth, paneHeight int) *viewer {
 	m := &viewer{
 		paneWidth:     paneWidth,
@@ -64,8 +58,8 @@ func newViewer(files []diff.File, paneWidth, paneHeight int) *viewer {
 	return m
 }
 
-// setSize updates the content-pane dimensions and re-renders, since the diff
-// text is wrapped and background-padded to the pane width.
+// setSize re-renders on a width change, since the text is wrapped and padded to
+// the pane width.
 func (m *viewer) setSize(paneWidth, paneHeight int) {
 	widthChanged := paneWidth != m.paneWidth
 	m.paneWidth = paneWidth
@@ -76,7 +70,6 @@ func (m *viewer) setSize(paneWidth, paneHeight int) {
 	m.clampScroll()
 }
 
-// totalLines returns the total number of lines in the rendered diff.
 func (m *viewer) totalLines() int {
 	if m.text == "" {
 		return 0
@@ -86,19 +79,16 @@ func (m *viewer) totalLines() int {
 
 // ── Scroll ───────────────────────────────────────────────────────────────────
 
-// scrollDown scrolls the viewer down by n lines.
 func (m *viewer) scrollDown(n int) {
 	m.offset += n
 	m.clampScroll()
 }
 
-// scrollUp scrolls the viewer up by n lines.
 func (m *viewer) scrollUp(n int) {
 	m.offset -= n
 	m.clampScroll()
 }
 
-// clampScroll ensures the viewer offset stays in bounds.
 func (m *viewer) clampScroll() {
 	total := m.totalLines()
 	maxOffset := total - m.paneHeight
@@ -115,10 +105,9 @@ func (m *viewer) clampScroll() {
 
 // ── File tracking ────────────────────────────────────────────────────────────
 
-// currentFileIndex returns the 0-based index of the file whose diff is
-// currently displayed. In line-select mode, this is the file owning the
-// selected line. After exiting line-select mode, the file index is frozen
-// until the user scrolls. Otherwise it is the file at the top of the pane.
+// currentFileIndex is the file owning the selected line in line-select mode, the
+// frozen file just after leaving it, and otherwise the file at the top of the
+// pane.
 func (m *viewer) currentFileIndex() int {
 	if m.lineSelectMode && m.selectedLine >= 0 && m.selectedLine < len(m.lineMeta) {
 		return m.lineMeta[m.selectedLine].fileIndex
@@ -140,8 +129,6 @@ func (m *viewer) currentFileIndex() int {
 	return idx
 }
 
-// currentFileName returns the name of the file currently being displayed, or
-// the empty string when there is no diff content.
 func (m *viewer) currentFileName() string {
 	idx := m.currentFileIndex()
 	if idx < 0 || idx >= len(m.fileNames) {
@@ -152,8 +139,7 @@ func (m *viewer) currentFileName() string {
 
 // ── Collapse/expand ─────────────────────────────────────────────────────────
 
-// toggleCollapse toggles the collapsed state of the current file.
-// It is a no-op for files with no hunks to display.
+// toggleCollapse is a no-op for files with no hunks to hide.
 func (m *viewer) toggleCollapse() {
 	idx := m.currentFileIndex()
 	if idx < 0 || idx >= len(m.files) {
@@ -166,7 +152,7 @@ func (m *viewer) toggleCollapse() {
 	wasLineSelect := m.lineSelectMode
 	m.lineSelectMode = false
 	m.rerender()
-	// Scroll to the toggled file's header so the user sees the change.
+	// Scroll to the file's header so the user sees what changed.
 	if idx < len(m.fileStarts) {
 		m.offset = m.fileStarts[idx]
 	}
@@ -176,14 +162,12 @@ func (m *viewer) toggleCollapse() {
 	}
 }
 
-// toggleCollapseAll collapses all files if any are expanded, or expands all
-// files if all are already collapsed.
+// toggleCollapseAll collapses everything unless it all already is, in which case
+// it expands.
 func (m *viewer) toggleCollapseAll() {
 	if len(m.files) == 0 {
 		return
 	}
-	// Determine target state: collapse all unless every collapsible file is
-	// already collapsed.
 	allCollapsed := true
 	for i, f := range m.files {
 		if len(f.Hunks) > 0 && !m.collapsed[i] {
@@ -205,7 +189,6 @@ func (m *viewer) toggleCollapseAll() {
 	}
 }
 
-// rerender re-renders the diff text from the stored files and collapse state.
 func (m *viewer) rerender() {
 	w := m.paneWidth
 	if w < 1 {
@@ -220,13 +203,12 @@ func (m *viewer) rerender() {
 
 // ── Line select mode ────────────────────────────────────────────────────────
 
-// isSelectable returns true if line at index i is a hunk content line.
 func (m *viewer) isSelectable(i int) bool {
 	return i >= 0 && i < len(m.lineMeta) && m.lineMeta[i].kind == diffLineHunkContent
 }
 
-// nearestSelectable searches outward from start in both directions and returns
-// the nearest selectable line, or -1 if none exists within [lo, hi).
+// nearestSelectable searches outward from start, returning -1 if nothing within
+// [lo, hi) is selectable.
 func (m *viewer) nearestSelectable(start, lo, hi int) int {
 	if hi > len(m.lineMeta) {
 		hi = len(m.lineMeta)
@@ -234,9 +216,8 @@ func (m *viewer) nearestSelectable(start, lo, hi int) int {
 	if lo < 0 {
 		lo = 0
 	}
-	// Clamp start into [lo, hi). When the diff content is shorter than half the
-	// pane, callers pass a start (the pane midpoint) past the end of the content;
-	// the bounded outward search below would then never reach the content window.
+	// Content shorter than half the pane leaves start (the pane midpoint) past
+	// the end, where the bounded search below would never reach the content.
 	if start < lo {
 		start = lo
 	}
@@ -256,9 +237,8 @@ func (m *viewer) nearestSelectable(start, lo, hi int) int {
 	return -1
 }
 
-// enterLineSelect enters line-select mode. The selection is placed on the
-// selectable line nearest to the vertical midpoint of the visible pane.
-// If no selectable line is visible, the mode is not entered.
+// enterLineSelect starts on the selectable line nearest the pane's midpoint, and
+// does nothing at all if none is visible.
 func (m *viewer) enterLineSelect() {
 	mid := m.offset + m.paneHeight/2
 	sel := m.nearestSelectable(mid, m.offset, m.offset+m.paneHeight)
@@ -270,8 +250,8 @@ func (m *viewer) enterLineSelect() {
 	m.frozenFileIdx = -1
 }
 
-// exitLineSelect leaves line-select mode and freezes the current file index
-// so it persists until the user scrolls.
+// exitLineSelect freezes the current file index so the status bar keeps naming
+// the file the user was on until they scroll away.
 func (m *viewer) exitLineSelect() {
 	if !m.lineSelectMode {
 		return
@@ -280,9 +260,7 @@ func (m *viewer) exitLineSelect() {
 	m.lineSelectMode = false
 }
 
-// nextSelectableLine returns the next selectable line from the current
-// selectedLine in the given direction (+1 for down, -1 for up), or -1
-// if there is no selectable line in that direction.
+// direction is +1 for down, -1 for up; -1 is returned when nothing is left.
 func (m *viewer) nextSelectableLine(direction int) int {
 	i := m.selectedLine + direction
 	for i >= 0 && i < len(m.lineMeta) {
@@ -294,8 +272,6 @@ func (m *viewer) nextSelectableLine(direction int) int {
 	return -1
 }
 
-// moveSelection moves the selected line by n steps in the given direction,
-// skipping non-selectable lines and scrolling to keep the selection visible.
 func (m *viewer) moveSelection(n, direction int) {
 	for i := 0; i < n; i++ {
 		next := m.nextSelectableLine(direction)
@@ -307,7 +283,6 @@ func (m *viewer) moveSelection(n, direction int) {
 	m.scrollToSelection()
 }
 
-// scrollToSelection adjusts the scroll offset so the selected line is visible.
 func (m *viewer) scrollToSelection() {
 	if m.selectedLine < m.offset {
 		m.offset = m.selectedLine
@@ -320,10 +295,8 @@ func (m *viewer) scrollToSelection() {
 
 // ── Selected location ────────────────────────────────────────────────────────
 
-// selectedLocation returns the file name and line number of the currently
-// selected line. The line number is zero when not in line-select mode, in
-// which case the file name is still the file at the top of the pane — that is
-// what "open the current file" means outside line-select mode.
+// selectedLocation falls back to the file at the top of the pane with no line
+// number, which is what "the current file" means outside line-select mode.
 func (m *viewer) selectedLocation() (fileName string, lineNum int) {
 	if !m.lineSelectMode || m.selectedLine < 0 || m.selectedLine >= len(m.lineMeta) {
 		return m.currentFileName(), 0
@@ -337,9 +310,7 @@ func (m *viewer) selectedLocation() (fileName string, lineNum int) {
 
 // ── Update ───────────────────────────────────────────────────────────────────
 
-// handleKey processes scroll, collapse, and line-select keys. Keys that belong
-// to the app (quit, edit, GitHub) are handled by the app model before this is
-// reached. It returns nil; no viewer key produces a command.
+// handleKey sees only what the app model did not claim first.
 func (m *viewer) handleKey(msg tea.KeyMsg) tea.Cmd {
 	if m.lineSelectMode {
 		return m.handleLineSelectKey(msg)
@@ -375,7 +346,6 @@ func (m *viewer) handleKey(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// handleLineSelectKey processes key events while in line-select mode.
 func (m *viewer) handleLineSelectKey(msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
 	case "up", "k":
@@ -400,15 +370,12 @@ func (m *viewer) handleLineSelectKey(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// clearFrozenFileIdx removes the frozen file index so that scrolling
-// resumes normal file tracking.
 func (m *viewer) clearFrozenFileIdx() {
 	m.frozenFileIdx = -1
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
-// renderPane renders the bordered diff content pane with its scrollbar.
 func (m *viewer) renderPane() string {
 	paneW := m.paneWidth
 	if paneW < 1 {
@@ -431,7 +398,6 @@ func (m *viewer) renderPane() string {
 		}
 		visible := lines[start:end]
 
-		// Highlight the selected line in line-select mode.
 		if m.lineSelectMode && m.selectedLine >= start && m.selectedLine < end {
 			idx := m.selectedLine - start
 			visible[idx] = theme.LineSelectStyle.Width(paneW).Render(
@@ -445,9 +411,7 @@ func (m *viewer) renderPane() string {
 	return injectScrollbar(rendered, "│", "█", m.offset, m.totalLines(), m.paneHeight)
 }
 
-// hintPairs returns alternating key/description pairs for the help text at the
-// bottom of the screen, ordered most to least important: a narrow terminal
-// elides from the end (see buildHintFit), except for the trailing quit pair.
+// Ordered most to least important, since buildHintFit elides from the end.
 func (m *viewer) hintPairs() []string {
 	if m.lineSelectMode {
 		return []string{

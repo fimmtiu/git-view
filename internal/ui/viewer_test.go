@@ -9,7 +9,6 @@ import (
 	"github.com/fimmtiu/git-view/internal/diff"
 )
 
-// key builds a KeyMsg for a single-character or named key.
 func key(s string) tea.KeyMsg {
 	switch s {
 	case "up":
@@ -170,7 +169,6 @@ func TestViewer_SetSizeClampsOffset(t *testing.T) {
 	}
 }
 
-// lineWidth returns the visible width of the widest styled line in text.
 func lineWidth(t *testing.T, text string) int {
 	t.Helper()
 	widest := 0
@@ -209,9 +207,8 @@ func TestViewer_ToggleCollapseScrollsToFileHeader(t *testing.T) {
 	v.offset = v.fileStarts[1] + 5
 	v.handleKey(key("c"))
 
-	// The toggled file's header must be on screen so the user sees what
-	// changed. It cannot always reach the top row: collapsing shortens the
-	// diff, and the scroll offset is clamped to the new end of the content.
+	// The header must be on screen, though not always at the top row: collapsing
+	// shortens the diff, and the offset is clamped to its new end.
 	header := v.fileStarts[1] + 1
 	if header < v.offset || header >= v.offset+v.paneHeight {
 		t.Errorf("collapsed file header at %d is outside the pane [%d, %d)",
@@ -362,7 +359,7 @@ func TestLineSelect_UpdatesCurrentFile(t *testing.T) {
 func TestLineSelect_ExitFreezesFileUntilScroll(t *testing.T) {
 	v := newViewer(largeSampleFiles(), 80, 10)
 	v.handleKey(key("enter"))
-	// Select a line in the second file while the pane is still scrolled to the first.
+	// A line in the second file, while the pane still shows the first.
 	v.selectedLine = v.fileStarts[1] + 3
 	v.handleKey(key("esc"))
 
@@ -424,7 +421,7 @@ func TestSelectedLocation_OutsideLineSelectHasNoLine(t *testing.T) {
 
 func TestViewer_RenderPaneHeight(t *testing.T) {
 	v := newViewer(largeSampleFiles(), 80, 10)
-	// Content rows plus the top and bottom border rows.
+	// Content rows plus two border rows.
 	if got, want := len(strings.Split(v.renderPane(), "\n")), 12; got != want {
 		t.Errorf("rendered pane height = %d, want %d", got, want)
 	}

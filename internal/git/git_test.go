@@ -8,9 +8,8 @@ import (
 	"testing"
 )
 
-// newRepo creates a temporary git repository with two commits and returns its
-// path. The first commit adds "one.txt", the second modifies it and adds
-// "two.txt", so range diffs have something to show.
+// A repo whose first commit adds one.txt and whose second modifies it and adds
+// two.txt, so range diffs have something to show.
 func newRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -57,7 +56,7 @@ func TestRepoRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RepoRoot: %v", err)
 	}
-	// macOS reports /private/var for /var, so compare resolved paths.
+	// macOS reports /private/var for /var.
 	wantResolved, _ := filepath.EvalSymlinks(dir)
 	gotResolved, _ := filepath.EvalSymlinks(root)
 	if gotResolved != wantResolved {
@@ -71,7 +70,6 @@ func TestRepoRoot_NotARepo(t *testing.T) {
 	}
 }
 
-// run executes a git command in dir, failing the test on error.
 func run(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
@@ -79,7 +77,6 @@ func run(t *testing.T, dir string, args ...string) {
 	}
 }
 
-// commits returns the repo's commit list, failing the test on error.
 func commits(t *testing.T, dir string) []CommitEntry {
 	t.Helper()
 	list, err := FetchCommitList(dir, 100)
@@ -95,7 +92,6 @@ func TestFetchCommitList(t *testing.T) {
 	if len(list) != 2 {
 		t.Fatalf("expected 2 commits, got %d", len(list))
 	}
-	// Newest first.
 	if list[0].Message != "second commit" {
 		t.Errorf("first entry = %q, want the newest commit", list[0].Message)
 	}
@@ -141,7 +137,7 @@ func TestFetchCommitList_EmptyRepo(t *testing.T) {
 	dir := t.TempDir()
 	run(t, dir, "init", "--initial-branch=main")
 
-	// A repo with no commits must not error; the selector shows "No commits".
+	// Must not error; the selector shows "No commits" instead.
 	if list, err := FetchCommitList(dir, 100); err == nil && len(list) != 0 {
 		t.Errorf("expected no commits, got %d", len(list))
 	}
@@ -157,8 +153,7 @@ func TestForkPointIndex_OnABranch(t *testing.T) {
 	run(t, dir, "-c", "user.name=T", "-c", "user.email=t@e.com", "commit", "-m", "feature commit")
 
 	list := commits(t, dir)
-	// Newest first: [feature commit, second commit, first commit]. The branch
-	// forked from main at "second commit", index 1.
+	// [feature commit, second commit, first commit]; the branch forked at index 1.
 	if got := ForkPointIndex(dir, list); got != 1 {
 		t.Errorf("ForkPointIndex = %d, want 1 (%q)", got, list[1].Message)
 	}
@@ -167,7 +162,7 @@ func TestForkPointIndex_OnABranch(t *testing.T) {
 func TestForkPointIndex_OnTheDefaultBranch(t *testing.T) {
 	dir := newRepo(t)
 
-	// On main, the merge base with main is HEAD itself: the newest commit.
+	// On main, the merge base with main is HEAD itself.
 	if got := ForkPointIndex(dir, commits(t, dir)); got != 0 {
 		t.Errorf("ForkPointIndex = %d, want 0", got)
 	}
@@ -177,7 +172,7 @@ func TestForkPointIndex_ForkPointOutsideTheList(t *testing.T) {
 	dir := newRepo(t)
 	run(t, dir, "checkout", "-b", "feature")
 
-	// Only the newest commit is in the list, but the fork point is older.
+	// The fork point is older than the one commit in the list.
 	list, err := FetchCommitList(dir, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -220,8 +215,7 @@ func TestHasUncommittedChanges_IgnoresUntrackedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HasUncommittedChanges: %v", err)
 	}
-	// FetchDiff runs plain `git diff`, which ignores untracked files, so
-	// offering the pseudo-commit here would open an empty diff.
+	// FetchDiff ignores untracked files, so the pseudo-commit would open empty.
 	if dirty {
 		t.Error("untracked files should not count as uncommitted changes")
 	}
@@ -253,8 +247,8 @@ func TestFetchShowStat_Uncommitted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchShowStat: %v", err)
 	}
-	// A leading blank line stands in for the missing commit subject, so the
-	// preview pane's "bold the first line" rule does not bold a stat row.
+	// The blank line stands in for the absent subject, so the preview pane's
+	// "bold the first line" rule does not bold a stat row.
 	if !strings.HasPrefix(out, "\n") {
 		t.Errorf("expected a leading blank line, got %q", out)
 	}
@@ -267,7 +261,6 @@ func TestFetchDiff_Range(t *testing.T) {
 	dir := newRepo(t)
 	list := commits(t, dir)
 
-	// The range covers both commits, so the diff runs from the empty tree.
 	out, err := FetchDiff(dir, list[1], list[0])
 	if err != nil {
 		t.Fatalf("FetchDiff: %v", err)
@@ -299,8 +292,7 @@ func TestFetchDiff_RootCommit(t *testing.T) {
 	dir := newRepo(t)
 	root := commits(t, dir)[1]
 
-	// The root commit has no parent, so "<root>^.." is not a range git accepts;
-	// it has to be diffed against the empty tree instead.
+	// git rejects "<root>^..", so this has to go through the empty tree.
 	out, err := FetchDiff(dir, root, root)
 	if err != nil {
 		t.Fatalf("FetchDiff: %v", err)
@@ -352,8 +344,7 @@ func TestFetchDiff_BadRevisionReportsGitStderr(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error for an unknown revision")
 	}
-	// exec.Cmd.Output() hides stderr in the error, so a bare "exit status 128"
-	// would leave the user with no idea what went wrong.
+	// exec.Cmd.Output() hides stderr, leaving a bare "exit status 128".
 	if !strings.Contains(err.Error(), "no-such-revision") {
 		t.Errorf("error should include git's own message, got %q", err)
 	}
@@ -371,7 +362,7 @@ func TestRepoLabel_UsesTheOriginRemoteName(t *testing.T) {
 func TestRepoLabel_FallsBackToTheDirectoryName(t *testing.T) {
 	dir := newRepo(t)
 
-	// With no origin remote, the working tree's own directory name stands in.
+	// With no origin remote, the directory name stands in.
 	got := RepoLabel(dir)
 	if !strings.HasPrefix(got, "📁 "+filepath.Base(dir)) {
 		t.Errorf("RepoLabel = %q, want it to name the directory %q", got, filepath.Base(dir))

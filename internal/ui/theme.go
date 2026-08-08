@@ -2,9 +2,6 @@ package ui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Theme holds every style the viewer uses. Colours are adaptive: lipgloss
-// detects whether the terminal has a light or dark background and picks the
-// matching value, so the diff backgrounds stay legible either way.
 type Theme struct {
 	PaneStyle       lipgloss.Style
 	StatusBarStyle  lipgloss.Style
@@ -15,7 +12,7 @@ type Theme struct {
 	ErrorStyle      lipgloss.Style
 	LabelBoldStyle  lipgloss.Style
 
-	// Diff content styles.
+	// Diff content.
 	HunkHeaderStyle lipgloss.Style
 	AddedStyle      lipgloss.Style
 	RemovedStyle    lipgloss.Style
@@ -24,7 +21,7 @@ type Theme struct {
 	RenamedMsgStyle lipgloss.Style
 	LineSelectStyle lipgloss.Style
 
-	// Commit selector styles.
+	// Commit selector.
 	SelectedStyle   lipgloss.Style
 	RangeStyle      lipgloss.Style
 	SeparatorStyle  lipgloss.Style
@@ -33,9 +30,8 @@ type Theme struct {
 	StatRemoveStyle lipgloss.Style
 }
 
-// Adaptive colour values, light background first. The light values are tuned
-// for white terminals (pastel backgrounds, dark foregrounds) and the dark
-// values for black ones (dark-tinted backgrounds, bright foregrounds).
+// Light values are tuned for white terminals (pastel backgrounds, dark
+// foregrounds), dark values for black ones.
 var (
 	colourBorder     = lipgloss.AdaptiveColor{Light: "25", Dark: "24"}
 	colourAccent     = lipgloss.AdaptiveColor{Light: "30", Dark: "37"}
@@ -54,8 +50,6 @@ var (
 	colourRenamed    = lipgloss.AdaptiveColor{Light: "25", Dark: "75"}
 )
 
-// theme is the single instance used throughout the app. It is built once at
-// init because lipgloss styles are immutable values, not resources.
 var theme = Theme{
 	PaneStyle: lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

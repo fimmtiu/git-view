@@ -6,10 +6,8 @@ import (
 	"strings"
 )
 
-// GitHubFileURL builds a github.com blob URL for a file in the repository,
-// optionally anchored at a line number. The ref is the current branch when the
-// working tree is on one, and the HEAD commit hash when detached — either way,
-// the target must have been pushed for the URL to resolve.
+// GitHubFileURL builds a blob URL, optionally anchored at a line. The ref must
+// have been pushed for the URL to resolve.
 func GitHubFileURL(repoRoot, file string, line int) (string, error) {
 	originURL, err := Output(repoRoot, "remote", "get-url", "origin")
 	if err != nil {
@@ -31,8 +29,6 @@ func GitHubFileURL(repoRoot, file string, line int) (string, error) {
 	return url, nil
 }
 
-// currentRef returns the checked-out branch name, falling back to the HEAD
-// commit hash when HEAD is detached.
 func currentRef(repoRoot string) (string, error) {
 	if branch, err := Output(repoRoot, "branch", "--show-current"); err == nil && branch != "" {
 		return branch, nil
@@ -44,19 +40,14 @@ func currentRef(repoRoot string) (string, error) {
 	return hash, nil
 }
 
-// extractGitHubRepo extracts "owner/repo" from a GitHub remote URL.
-// Handles both SSH (git@github.com:owner/repo.git) and HTTPS
-// (https://github.com/owner/repo.git) formats. Returns "" for non-GitHub
-// remotes.
+// extractGitHubRepo pulls "owner/repo" from an SSH or HTTPS GitHub remote URL,
+// returning "" for anything else.
 func extractGitHubRepo(url string) string {
-	// SSH format: git@github.com:owner/repo.git
 	if repo, ok := strings.CutPrefix(url, "git@github.com:"); ok {
 		return strings.TrimSuffix(repo, ".git")
 	}
-	// HTTPS format: https://github.com/owner/repo.git
 	if _, after, found := strings.Cut(url, "github.com/"); found {
 		repo := strings.TrimSuffix(after, ".git")
-		// Strip trailing path segments beyond owner/repo.
 		parts := strings.SplitN(repo, "/", 3)
 		if len(parts) >= 2 {
 			return parts[0] + "/" + parts[1]

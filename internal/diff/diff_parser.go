@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// FileType classifies the kind of change a file underwent.
 type FileType int
 
 const (
@@ -16,7 +15,6 @@ const (
 	New
 )
 
-// LineType classifies a single line within a hunk.
 type LineType int
 
 const (
@@ -25,7 +23,6 @@ const (
 	LineRemoved
 )
 
-// File represents a single file entry in a unified diff.
 type File struct {
 	Name     string
 	Type     FileType
@@ -33,7 +30,6 @@ type File struct {
 	Hunks    []Hunk
 }
 
-// Hunk represents one @@ section within a file diff.
 type Hunk struct {
 	Context  string
 	OldStart int
@@ -43,13 +39,12 @@ type Hunk struct {
 	Lines    []Line
 }
 
-// Line represents a single content line within a hunk.
 type Line struct {
 	Type    LineType
 	Content string
 }
 
-// Parse splits raw `git diff` output into structured File values.
+// Parse turns raw `git diff` output into structured File values.
 func Parse(raw string) []File {
 	sections := splitDiffSections(raw)
 	files := make([]File, 0, len(sections))
@@ -63,8 +58,8 @@ func Parse(raw string) []File {
 	return files
 }
 
-// splitDiffSections splits the raw diff at "diff --git" boundaries, returning
-// one string per file. The leading "diff --git …" line is included in each.
+// splitDiffSections returns one string per file, each keeping its "diff --git"
+// line.
 func splitDiffSections(raw string) []string {
 	const marker = "diff --git "
 	var sections []string
@@ -86,7 +81,6 @@ func splitDiffSections(raw string) []string {
 	return sections
 }
 
-// parseFileSection parses a single file's diff section into a File.
 func parseFileSection(section string) File {
 	lines := strings.Split(section, "\n")
 	if len(lines) == 0 || lines[0] == "" {
@@ -105,9 +99,8 @@ func parseFileSection(section string) File {
 	return f
 }
 
-// detectFileType scans the header lines before the first @@ to determine the
-// file's change type (binary, delete, new, rename). It returns true when the
-// caller should stop processing (binary files have no hunks).
+// detectFileType reads the headers before the first @@, returning true when there
+// is nothing further to parse (binary files have no hunks).
 func (f *File) detectFileType(headerLines []string, bName string) bool {
 	hasSimilarityIndex := false
 	for _, line := range headerLines {
@@ -140,21 +133,16 @@ func (f *File) detectFileType(headerLines []string, bName string) bool {
 	return false
 }
 
-// parseGitHeader extracts the two filenames from a "diff --git a/X b/Y" line.
-// It handles filenames that may contain spaces by scanning left-to-right for
-// the first " b/" separator after the "a/" prefix.
+// parseGitHeader pulls both filenames out of a "diff --git a/X b/Y" line.
 func parseGitHeader(header string) (aName, bName string) {
-	// Strip the "diff --git " prefix.
 	rest := strings.TrimPrefix(header, "diff --git ")
 
-	// The line is "a/<path> b/<path>". We need to find the split point between
-	// the two paths. Because paths can contain spaces, we look for " b/" as
-	// the separator. The a/ path starts at index 2 (after "a/").
+	// Paths may contain spaces, so " b/" is the only reliable split point. The
+	// search starts past the leading "a/" so a path of its own cannot match.
 	sep := " b/"
-	// Start searching after "a/" (at least position 2).
 	idx := strings.Index(rest[2:], sep)
 	if idx == -1 {
-		// Fallback: treat the whole thing as the name (shouldn't happen with valid diff).
+		// Unreachable for valid diff output.
 		name := strings.TrimPrefix(rest, "a/")
 		return name, name
 	}
@@ -163,7 +151,6 @@ func parseGitHeader(header string) (aName, bName string) {
 	return aName, bName
 }
 
-// parseHunks extracts all Hunk values from the lines of a file section.
 func parseHunks(lines []string) []Hunk {
 	var hunks []Hunk
 	var current *Hunk
@@ -187,10 +174,9 @@ func parseHunks(lines []string) []Hunk {
 	return hunks
 }
 
-// parseHunkHeader parses an "@@ -old,count +new,count @@ context" line.
+// Parses "@@ -old,count +new,count @@ context".
 func parseHunkHeader(line string) Hunk {
 	var h Hunk
-	// Find the closing "@@" after the opening one.
 	rest := line[2:] // skip leading "@@"
 	end := strings.Index(rest, "@@")
 	if end == -1 {
@@ -199,7 +185,7 @@ func parseHunkHeader(line string) Hunk {
 	rangePart := strings.TrimSpace(rest[:end])
 	h.Context = strings.TrimSpace(rest[end+2:])
 
-	// rangePart looks like "-10,6 +10,7"
+	// rangePart looks like "-10,6 +10,7".
 	parts := strings.Fields(rangePart)
 	if len(parts) >= 1 {
 		h.OldStart, h.OldCount = parseRange(parts[0])
@@ -210,9 +196,8 @@ func parseHunkHeader(line string) Hunk {
 	return h
 }
 
-// parseRange parses a range like "-10,6" or "+10,7" into start and count.
+// Parses "-10,6" or "+10,7" into start and count.
 func parseRange(s string) (int, int) {
-	// Strip the leading - or +.
 	s = strings.TrimLeft(s, "-+")
 	if strings.Contains(s, ",") {
 		parts := strings.SplitN(s, ",", 2)
@@ -233,9 +218,8 @@ func parseRange(s string) (int, int) {
 	return start, 1
 }
 
-// classifyLine determines the type of a diff content line. It returns false
-// for lines that are not part of the diff content (e.g. "\ No newline at end
-// of file").
+// classifyLine returns false for lines that are not diff content, such as
+// "\ No newline at end of file".
 func classifyLine(line string) (Line, bool) {
 	if len(line) == 0 {
 		return Line{}, false
