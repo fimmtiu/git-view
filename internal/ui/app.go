@@ -411,14 +411,13 @@ func (m Model) renderViewerStatusBar(width int) string {
 	total := len(m.viewer.fileNames)
 
 	left1 := theme.LabelBoldStyle.Render(commitRangeLabel(m.viewStart, m.viewEnd))
-	right1 := ""
-	if total > 0 {
-		right1 = fmt.Sprintf("File %d of %d", m.viewer.currentFileIndex()+1, total)
-	}
-	line1 := joinEnds(left1, right1, width)
+	line1 := joinEnds(left1, m.repoLabel, width)
 
 	// A status message takes all of line 2; the filename yields to it.
-	right2 := m.repoLabel
+	right2 := ""
+	if total > 0 {
+		right2 = fmt.Sprintf("File %d of %d", m.viewer.currentFileIndex()+1, total)
+	}
 	if m.status != "" {
 		right2 = m.statusText(width - 2)
 	}

@@ -187,14 +187,14 @@ func TestView_ViewerStatusBar(t *testing.T) {
 	if !strings.Contains(line1, "Commit ") {
 		t.Errorf("line 1 should name the commit range, got %q", line1)
 	}
-	if !strings.Contains(line1, "File 1 of 2") {
-		t.Errorf("line 1 should show the file position, got %q", line1)
+	if !strings.Contains(line1, "📁 myrepo ⎇  main") {
+		t.Errorf("line 1 should show the repo label, got %q", line1)
 	}
 	if !strings.Contains(line2, "internal/ui/app.go") {
 		t.Errorf("line 2 should show the current filename, got %q", line2)
 	}
-	if !strings.Contains(line2, "📁 myrepo ⎇  main") {
-		t.Errorf("line 2 should show the repo label, got %q", line2)
+	if !strings.Contains(line2, "File 1 of 2") {
+		t.Errorf("line 2 should show the file position, got %q", line2)
 	}
 }
 
