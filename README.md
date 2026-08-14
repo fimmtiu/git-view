@@ -28,9 +28,9 @@ The app opens on the commit selector. The left pane lists the most recent 100
 commits on the current branch, newest first, and the right pane shows
 `git show --stat` for whichever one the cursor is on.
 
-- Uncommitted changes to tracked files appear at the top as `???? Uncommitted
-  changes`. Untracked files are not included, since `git diff` would not show
-  them anyway.
+- Uncommitted changes appear at the top as `???? Uncommitted changes`. This
+  covers modified tracked files and untracked ones, which show as new files.
+  Ignored files and staged-only changes are left out.
 - A horizontal rule marks where the current branch diverged from `main` or
   `master`, separating your commits from the ones you branched off.
 - Merge commits are omitted.

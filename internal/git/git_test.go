@@ -205,7 +205,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 	}
 }
 
-func TestHasUncommittedChanges_IgnoresUntrackedFiles(t *testing.T) {
+func TestHasUncommittedChanges_CountsUntrackedFiles(t *testing.T) {
 	dir := newRepo(t)
 	if err := os.WriteFile(filepath.Join(dir, "untracked.txt"), []byte("new\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -215,9 +215,28 @@ func TestHasUncommittedChanges_IgnoresUntrackedFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HasUncommittedChanges: %v", err)
 	}
-	// FetchDiff ignores untracked files, so the pseudo-commit would open empty.
+	if !dirty {
+		t.Error("an untracked file should count as uncommitted changes")
+	}
+}
+
+func TestHasUncommittedChanges_IgnoresIgnoredFiles(t *testing.T) {
+	dir := newRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("junk.txt\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "add", ".gitignore")
+	run(t, dir, "-c", "user.email=t@example.com", "-c", "user.name=T", "commit", "-m", "ignore junk")
+	if err := os.WriteFile(filepath.Join(dir, "junk.txt"), []byte("noise\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dirty, err := HasUncommittedChanges(dir)
+	if err != nil {
+		t.Fatalf("HasUncommittedChanges: %v", err)
+	}
 	if dirty {
-		t.Error("untracked files should not count as uncommitted changes")
+		t.Error("an ignored file should not count as uncommitted changes")
 	}
 }
 
@@ -254,6 +273,21 @@ func TestFetchShowStat_Uncommitted(t *testing.T) {
 	}
 	if !strings.Contains(out, "one.txt") {
 		t.Errorf("expected the changed file, got %q", out)
+	}
+}
+
+func TestFetchShowStat_UncommittedIncludesUntrackedFiles(t *testing.T) {
+	dir := newRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "three.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := FetchShowStat(dir, UncommittedHash)
+	if err != nil {
+		t.Fatalf("FetchShowStat: %v", err)
+	}
+	if !strings.Contains(out, "three.txt") {
+		t.Errorf("expected the untracked file in the stat listing, got %q", out)
 	}
 }
 
@@ -334,6 +368,82 @@ func TestFetchDiff_CommitThroughUncommitted(t *testing.T) {
 	}
 	if !strings.Contains(out, "+third") {
 		t.Errorf("expected the working tree change, got %q", out)
+	}
+}
+
+// Untracked files reach the diff through a throwaway copy of the index, so this
+// also checks that the real index keeps its staged content.
+func TestFetchDiff_UncommittedIncludesUntrackedFiles(t *testing.T) {
+	dir := newRepo(t)
+	for name, content := range map[string]string{
+		"three.txt":            "brand new\n",
+		"nested/deep.txt":      "deeper\n",
+		"a name with space.md": "spaced\n",
+		"staged.txt":           "staged\n",
+	} {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "one.txt"), []byte("first\nsecond\nthird\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run(t, dir, "add", "staged.txt")
+	uncommitted := CommitEntry{Hash: UncommittedHash}
+
+	out, err := FetchDiff(dir, uncommitted, uncommitted)
+	if err != nil {
+		t.Fatalf("FetchDiff: %v", err)
+	}
+	for _, want := range []string{"+third", "+brand new", "nested/deep.txt", "a name with space.md"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in the diff, got %q", want, out)
+		}
+	}
+	// Staged content belongs to the index, not the working tree.
+	if strings.Contains(out, "staged.txt") {
+		t.Errorf("a staged file should stay out of the diff, got %q", out)
+	}
+	if status, err := Output(dir, "status", "--short"); err != nil {
+		t.Fatal(err)
+	} else if !strings.Contains(status, "A  staged.txt") {
+		t.Errorf("the real index should still hold the staged file, got %q", status)
+	}
+}
+
+func TestFetchDiff_CommitThroughUncommittedIncludesUntrackedFiles(t *testing.T) {
+	dir := newRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "three.txt"), []byte("brand new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	list := commits(t, dir)
+
+	out, err := FetchDiff(dir, list[0], CommitEntry{Hash: UncommittedHash})
+	if err != nil {
+		t.Fatalf("FetchDiff: %v", err)
+	}
+	if !strings.Contains(out, "+brand new") {
+		t.Errorf("expected the untracked file, got %q", out)
+	}
+}
+
+func TestFetchDiff_RangeOmitsUntrackedFiles(t *testing.T) {
+	dir := newRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "three.txt"), []byte("brand new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	list := commits(t, dir)
+
+	out, err := FetchDiff(dir, list[1], list[0])
+	if err != nil {
+		t.Fatalf("FetchDiff: %v", err)
+	}
+	if strings.Contains(out, "three.txt") {
+		t.Errorf("a commit range should not reach the working tree, got %q", out)
 	}
 }
 

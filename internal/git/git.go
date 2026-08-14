@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -18,8 +19,16 @@ type CommitEntry struct {
 }
 
 func Output(dir string, args ...string) (string, error) {
-	fullArgs := append([]string{"-C", dir}, args...)
-	out, err := exec.Command("git", fullArgs...).Output()
+	return outputWithEnv(dir, nil, args...)
+}
+
+// outputWithEnv adds extra "NAME=value" entries to git's environment.
+func outputWithEnv(dir string, env []string, args ...string) (string, error) {
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+	out, err := cmd.Output()
 	if err != nil {
 		return "", wrapGitError(err)
 	}
@@ -139,10 +148,13 @@ func indexOfHash(commits []CommitEntry, hash string) int {
 	return -1
 }
 
-// HasUncommittedChanges reports whether plain `git diff` would produce output.
-// Matching FetchDiff exactly — so untracked and staged-only changes don't count
-// — keeps the pseudo-commit from opening an empty diff.
+// HasUncommittedChanges reports whether the working tree holds modified tracked
+// files or untracked ones. Matching what workingTreeDiff shows — so staged-only
+// changes don't count — keeps the pseudo-commit from opening an empty diff.
 func HasUncommittedChanges(repoRoot string) (bool, error) {
+	if len(untrackedFiles(repoRoot)) > 0 {
+		return true, nil
+	}
 	err := exec.Command("git", "-C", repoRoot, "diff", "--quiet").Run()
 	if err == nil {
 		return false, nil
@@ -154,10 +166,87 @@ func HasUncommittedChanges(repoRoot string) (bool, error) {
 	return false, err
 }
 
+// untrackedFiles lists the paths git reports as "??": untracked and not ignored.
+// Paths are relative to repoRoot, and NUL separation keeps git from quoting the
+// unusual ones.
+func untrackedFiles(repoRoot string) []string {
+	out, err := Output(repoRoot, "ls-files", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil
+	}
+	var files []string
+	for _, name := range strings.Split(out, "\x00") {
+		if name != "" {
+			files = append(files, name)
+		}
+	}
+	return files
+}
+
+// workingTreeDiff runs a diff command that reads the working tree, with the
+// untracked files included. They get marked intent-to-add in a throwaway copy of
+// the index, which makes git report them as new files; the real index is never
+// touched. If any part of that setup fails, the diff still runs, but it shows
+// tracked files only.
+func workingTreeDiff(repoRoot string, args ...string) (string, error) {
+	untracked := untrackedFiles(repoRoot)
+	if len(untracked) == 0 {
+		return Output(repoRoot, args...)
+	}
+
+	indexFile, cleanup, err := copyIndex(repoRoot)
+	if err != nil {
+		return Output(repoRoot, args...)
+	}
+	defer cleanup()
+
+	env := []string{"GIT_INDEX_FILE=" + indexFile}
+	addArgs := append([]string{"add", "--intent-to-add", "--"}, untracked...)
+	if _, err := outputWithEnv(repoRoot, env, addArgs...); err != nil {
+		return Output(repoRoot, args...)
+	}
+	return outputWithEnv(repoRoot, env, args...)
+}
+
+// copyIndex writes a scratch copy of the repository's index file and returns its
+// path together with a cleanup function.
+func copyIndex(repoRoot string) (string, func(), error) {
+	indexPath, err := Output(repoRoot, "rev-parse", "--git-path", "index")
+	if err != nil {
+		return "", nil, err
+	}
+	if !filepath.IsAbs(indexPath) {
+		indexPath = filepath.Join(repoRoot, indexPath)
+	}
+
+	dir, err := os.MkdirTemp("", "git-view-index")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup := func() { os.RemoveAll(dir) }
+	copyPath := filepath.Join(dir, "index")
+
+	data, err := os.ReadFile(indexPath)
+	if errors.Is(err, os.ErrNotExist) {
+		// A repo that has never staged anything has no index yet, and an empty
+		// file is not a valid one, so leave the copy for `git add` to create.
+		return copyPath, cleanup, nil
+	}
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	if err := os.WriteFile(copyPath, data, 0o600); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	return copyPath, cleanup, nil
+}
+
 // FetchShowStat returns the commit message followed by its --stat file list.
 func FetchShowStat(repoRoot, commitHash string) (string, error) {
 	if commitHash == UncommittedHash {
-		out, err := Output(repoRoot, "diff", "--stat")
+		out, err := workingTreeDiff(repoRoot, "diff", "--stat")
 		if err != nil {
 			return "", err
 		}
@@ -172,15 +261,19 @@ func FetchShowStat(repoRoot, commitHash string) (string, error) {
 // starts at startCommit's parent so its own changes are included.
 func FetchDiff(repoRoot string, startCommit, endCommit CommitEntry) (string, error) {
 	args := []string{"diff", "--find-renames"}
+	run := workingTreeDiff
 	switch {
 	case startCommit.Hash == UncommittedHash && endCommit.Hash == UncommittedHash:
 	case endCommit.Hash == UncommittedHash:
 		args = append(args, startCommit.Hash)
 	default:
 		args = append(args, diffBase(repoRoot, startCommit.Hash)+".."+endCommit.Hash)
+		// A commit range never reaches the working tree, so untracked files
+		// have no place in it.
+		run = Output
 	}
 
-	out, err := Output(repoRoot, args...)
+	out, err := run(repoRoot, args...)
 	if err != nil {
 		return "", fmt.Errorf("git diff: %w", err)
 	}
