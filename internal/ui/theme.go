@@ -28,6 +28,11 @@ type Theme struct {
 	CommitHashStyle lipgloss.Style
 	StatAddStyle    lipgloss.Style
 	StatRemoveStyle lipgloss.Style
+
+	// Search.
+	SearchMatchStyle  lipgloss.Style
+	SearchPromptStyle lipgloss.Style
+	SearchCursorStyle lipgloss.Style
 }
 
 // Light values are tuned for white terminals (pastel backgrounds, dark
@@ -48,6 +53,12 @@ var (
 	colourRemoved    = lipgloss.AdaptiveColor{Light: "224", Dark: "52"}
 	colourDeleted    = lipgloss.AdaptiveColor{Light: "88", Dark: "167"}
 	colourRenamed    = lipgloss.AdaptiveColor{Light: "25", Dark: "75"}
+	// A search match lands on any of three backgrounds — added, removed, or the
+	// terminal's own — so it sets both of its colours and keeps them far from all
+	// three. Its foreground stays dark, because the two palettes disagree about
+	// the default one.
+	colourMatch   = lipgloss.AdaptiveColor{Light: "220", Dark: "214"}
+	colourOnMatch = lipgloss.AdaptiveColor{Light: "16", Dark: "16"}
 )
 
 var theme = Theme{
@@ -85,4 +96,11 @@ var theme = Theme{
 	CommitHashStyle: lipgloss.NewStyle().Bold(true).Foreground(colourMuted),
 	StatAddStyle:    lipgloss.NewStyle().Foreground(colourSuccess),
 	StatRemoveStyle: lipgloss.NewStyle().Foreground(colourDanger),
+	SearchMatchStyle: lipgloss.NewStyle().
+		Background(colourMatch).
+		Foreground(colourOnMatch),
+	SearchPromptStyle: lipgloss.NewStyle().Bold(true),
+	SearchCursorStyle: lipgloss.NewStyle().
+		Background(colourAccent).
+		Foreground(colourOnAccent),
 }

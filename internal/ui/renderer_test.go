@@ -30,7 +30,7 @@ func TestRenderDiff_NormalFile(t *testing.T) {
 		},
 	}
 
-	lines := strings.Split(renderDiff(files, 60, nil).text, "\n")
+	lines := strings.Split(renderDiff(files, 60, nil, "").text, "\n")
 
 	if lines[0] != "" {
 		t.Errorf("expected blank separator line first, got %q", lines[0])
@@ -65,7 +65,7 @@ func TestRenderDiff_LineNumbers(t *testing.T) {
 		},
 	}
 
-	lines := strings.Split(renderDiff(files, 60, nil).text, "\n")
+	lines := strings.Split(renderDiff(files, 60, nil, "").text, "\n")
 	// [0] blank, [1] filename, [2] hunk header, [3..] content.
 	plain := func(i int) string { return stripAnsi(lines[i]) }
 
@@ -101,7 +101,7 @@ func TestRenderDiff_LineNumberColumnWidth(t *testing.T) {
 		},
 	}
 
-	lines := strings.Split(renderDiff(files, 60, nil).text, "\n")
+	lines := strings.Split(renderDiff(files, 60, nil, "").text, "\n")
 	// 998+3 = 1001, so four columns.
 	if got := stripAnsi(lines[3]); !strings.HasPrefix(got, " 998 ") {
 		t.Errorf("expected four-column line number, got %q", got)
@@ -126,7 +126,7 @@ func TestRenderDiff_NoPlusMinusPrefixes(t *testing.T) {
 		},
 	}
 
-	for _, line := range strings.Split(renderDiff(files, 60, nil).text, "\n") {
+	for _, line := range strings.Split(renderDiff(files, 60, nil, "").text, "\n") {
 		trimmed := strings.TrimSpace(stripAnsi(line))
 		if strings.HasPrefix(trimmed, "+") || strings.HasPrefix(trimmed, "-") {
 			t.Errorf("content line should not keep its +/- prefix: %q", trimmed)
@@ -153,7 +153,7 @@ func TestRenderDiff_BackgroundsSpanPaneWidth(t *testing.T) {
 	}
 
 	const paneWidth = 40
-	lines := strings.Split(renderDiff(files, paneWidth, nil).text, "\n")
+	lines := strings.Split(renderDiff(files, paneWidth, nil, "").text, "\n")
 	// Header, removed, and added lines carry a background, which must not stop
 	// at the end of the text.
 	for _, i := range []int{2, 3, 4} {
@@ -179,7 +179,7 @@ func TestRenderDiff_WrapsLongLinesToFullWidth(t *testing.T) {
 	}
 
 	const paneWidth = 20
-	rd := renderDiff(files, paneWidth, nil)
+	rd := renderDiff(files, paneWidth, nil, "")
 	lines := strings.Split(rd.text, "\n")
 
 	wrapped := lines[3:]
@@ -222,7 +222,7 @@ func TestRenderDiff_EveryLineFitsThePane(t *testing.T) {
 	}
 
 	for _, paneWidth := range []int{20, 40, 80} {
-		rd := renderDiff(files, paneWidth, nil)
+		rd := renderDiff(files, paneWidth, nil, "")
 		lines := strings.Split(rd.text, "\n")
 		for i, line := range lines {
 			if w := lipgloss.Width(line); w > paneWidth {
@@ -252,7 +252,7 @@ func TestRenderDiff_WrappedContextLineHasNoBackground(t *testing.T) {
 	}
 
 	// Context lines share the wrapping path but must gain no background.
-	for _, line := range strings.Split(renderDiff(files, 20, nil).text, "\n")[3:] {
+	for _, line := range strings.Split(renderDiff(files, 20, nil, "").text, "\n")[3:] {
 		if strings.Contains(line, "\x1b") {
 			t.Errorf("context line should carry no styling, got %q", line)
 		}
@@ -262,7 +262,7 @@ func TestRenderDiff_WrappedContextLineHasNoBackground(t *testing.T) {
 func TestRenderDiff_BinaryFile(t *testing.T) {
 	files := []diff.File{{Name: "bin/fooble", Type: diff.Binary}}
 
-	text := renderDiff(files, 60, nil).text
+	text := renderDiff(files, 60, nil, "").text
 	if !strings.Contains(text, "bin/fooble") {
 		t.Errorf("expected filename, got %q", text)
 	}
@@ -274,7 +274,7 @@ func TestRenderDiff_BinaryFile(t *testing.T) {
 func TestRenderDiff_DeletedFile(t *testing.T) {
 	files := []diff.File{{Name: "gone.go", Type: diff.Delete}}
 
-	text := renderDiff(files, 60, nil).text
+	text := renderDiff(files, 60, nil, "").text
 	if !strings.Contains(text, "gone.go") || !strings.Contains(text, "Deleted") {
 		t.Errorf("expected filename and Deleted message, got %q", text)
 	}
@@ -283,7 +283,7 @@ func TestRenderDiff_DeletedFile(t *testing.T) {
 func TestRenderDiff_RenamedFile(t *testing.T) {
 	files := []diff.File{{Name: "old.go", Type: diff.Rename, RenameTo: "new.go"}}
 
-	text := stripAnsi(renderDiff(files, 60, nil).text)
+	text := stripAnsi(renderDiff(files, 60, nil, "").text)
 	if !strings.Contains(text, "Renamed to new.go") {
 		t.Errorf("expected rename message, got %q", text)
 	}
@@ -305,7 +305,7 @@ func TestRenderDiff_RenamedFileKeepsHunks(t *testing.T) {
 		},
 	}
 
-	text := stripAnsi(renderDiff(files, 60, nil).text)
+	text := stripAnsi(renderDiff(files, 60, nil, "").text)
 	if !strings.Contains(text, "Renamed to new.go") {
 		t.Errorf("expected rename message, got %q", text)
 	}
@@ -323,7 +323,7 @@ func TestRenderDiff_HunkHeaderNoContext(t *testing.T) {
 		},
 	}
 
-	header := strings.TrimSpace(stripAnsi(strings.Split(renderDiff(files, 60, nil).text, "\n")[2]))
+	header := strings.TrimSpace(stripAnsi(strings.Split(renderDiff(files, 60, nil, "").text, "\n")[2]))
 	if header != "@@" {
 		t.Errorf("expected a bare @@ header, got %q", header)
 	}
@@ -345,7 +345,7 @@ func TestRenderDiff_HunkHeaderStripsLineRanges(t *testing.T) {
 		},
 	}
 
-	header := stripAnsi(strings.Split(renderDiff(files, 60, nil).text, "\n")[2])
+	header := stripAnsi(strings.Split(renderDiff(files, 60, nil, "").text, "\n")[2])
 	if !strings.Contains(header, "@@ func handleKey()") {
 		t.Errorf("expected @@ plus context, got %q", header)
 	}
@@ -355,7 +355,7 @@ func TestRenderDiff_HunkHeaderStripsLineRanges(t *testing.T) {
 }
 
 func TestRenderDiff_FileStartsAndBlankSeparators(t *testing.T) {
-	rd := renderDiff(sampleFiles(), 60, nil)
+	rd := renderDiff(sampleFiles(), 60, nil, "")
 	lines := strings.Split(rd.text, "\n")
 
 	if len(rd.fileStarts) != 2 {
@@ -373,7 +373,7 @@ func TestRenderDiff_FileStartsAndBlankSeparators(t *testing.T) {
 
 func TestRenderDiff_Collapsed(t *testing.T) {
 	files := sampleFiles()
-	rd := renderDiff(files, 60, []bool{true, false})
+	rd := renderDiff(files, 60, []bool{true, false}, "")
 	text := stripAnsi(rd.text)
 
 	if strings.Contains(text, "fmt.Println(\"hello\")") {
@@ -391,7 +391,7 @@ func TestRenderDiff_Collapsed(t *testing.T) {
 }
 
 func TestRenderDiff_CollapsedHasNoSelectableLines(t *testing.T) {
-	rd := renderDiff(sampleFiles(), 60, []bool{true, true})
+	rd := renderDiff(sampleFiles(), 60, []bool{true, true}, "")
 	for i, meta := range rd.lineMeta {
 		if meta.kind == diffLineHunkContent {
 			t.Fatalf("line %d is selectable in a fully collapsed diff", i)
@@ -400,21 +400,21 @@ func TestRenderDiff_CollapsedHasNoSelectableLines(t *testing.T) {
 }
 
 func TestRenderDiff_EmptyInput(t *testing.T) {
-	rd := renderDiff(nil, 60, nil)
+	rd := renderDiff(nil, 60, nil, "")
 	if rd.text != "" || rd.fileStarts != nil || rd.lineMeta != nil {
 		t.Errorf("expected a zero renderedDiff for no files, got %+v", rd)
 	}
 }
 
 func TestRenderDiff_LineMetaMatchesLineCount(t *testing.T) {
-	rd := renderDiff(sampleFiles(), 60, nil)
+	rd := renderDiff(sampleFiles(), 60, nil, "")
 	if got, want := len(rd.lineMeta), len(strings.Split(rd.text, "\n")); got != want {
 		t.Errorf("lineMeta entries = %d, rendered lines = %d", got, want)
 	}
 }
 
 func TestRenderDiff_LineMetaMarksOnlyHunkContentSelectable(t *testing.T) {
-	rd := renderDiff(sampleFiles(), 60, nil)
+	rd := renderDiff(sampleFiles(), 60, nil, "")
 	lines := strings.Split(rd.text, "\n")
 
 	for i, meta := range rd.lineMeta {
@@ -431,7 +431,7 @@ func TestRenderDiff_LineMetaMarksOnlyHunkContentSelectable(t *testing.T) {
 
 func TestRenderDiff_LineMetaFileIndex(t *testing.T) {
 	files := sampleFiles()
-	rd := renderDiff(files, 60, nil)
+	rd := renderDiff(files, 60, nil, "")
 
 	for i, meta := range rd.lineMeta {
 		want := 0

@@ -47,6 +47,23 @@ func buildHintFit(width int, pairs ...string) string {
 	return kept.String() + tail
 }
 
+func joinHint(parts ...string) string {
+	return strings.Join(parts, theme.HintDescStyle.Render(hintSeparator))
+}
+
+// firstThatFits returns the first candidate no wider than width, or "" when none
+// of them is. Styled text cannot be cut down by rune the way plain text can —
+// that would slice an escape sequence in half — so the shorter wording has to be
+// written out and picked instead.
+func firstThatFits(width int, candidates ...string) string {
+	for _, candidate := range candidates {
+		if lipgloss.Width(candidate) <= width {
+			return candidate
+		}
+	}
+	return ""
+}
+
 func hintPair(key, desc string) string {
 	return theme.HintKeyStyle.Render(key) + theme.HintDescStyle.Render(" "+desc)
 }

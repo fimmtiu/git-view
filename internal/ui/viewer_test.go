@@ -25,6 +25,24 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEsc}
 	case " ":
 		return tea.KeyMsg{Type: tea.KeySpace}
+	case "left":
+		return tea.KeyMsg{Type: tea.KeyLeft}
+	case "right":
+		return tea.KeyMsg{Type: tea.KeyRight}
+	case "home":
+		return tea.KeyMsg{Type: tea.KeyHome}
+	case "end":
+		return tea.KeyMsg{Type: tea.KeyEnd}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
+	case "backspace":
+		return tea.KeyMsg{Type: tea.KeyBackspace}
+	case "delete":
+		return tea.KeyMsg{Type: tea.KeyDelete}
+	case "ctrl+a":
+		return tea.KeyMsg{Type: tea.KeyCtrlA}
+	case "ctrl+e":
+		return tea.KeyMsg{Type: tea.KeyCtrlE}
 	default:
 		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 	}

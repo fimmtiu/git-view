@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -37,6 +39,16 @@ type viewer struct {
 	lineSelectMode bool
 	selectedLine   int
 	frozenFileIdx  int // -1 when not frozen; see exitLineSelect
+
+	// Search. The prompt line stays up while searchActive, but only takes typed
+	// characters while searchEditing; see handleSearchEditKey. searchTerm is the
+	// committed input — what the highlights and matchLines were built from.
+	searchActive  bool
+	searchEditing bool
+	searchInput   []rune
+	searchCursor  int // an index into searchInput; len(searchInput) is the end
+	searchTerm    string
+	matchLines    []int
 }
 
 // paneWidth and paneHeight cover the content area only.
@@ -194,10 +206,11 @@ func (m *viewer) rerender() {
 	if w < 1 {
 		w = 1
 	}
-	rd := renderDiff(m.files, w, m.collapsed)
+	rd := renderDiff(m.files, w, m.collapsed, m.searchTerm)
 	m.text = rd.text
 	m.fileStarts = rd.fileStarts
 	m.lineMeta = rd.lineMeta
+	m.matchLines = rd.matchLines
 	m.clampScroll()
 }
 
@@ -293,6 +306,124 @@ func (m *viewer) scrollToSelection() {
 	m.clampScroll()
 }
 
+// ── Search ───────────────────────────────────────────────────────────────────
+
+// startSearch opens the prompt. Any earlier term stays in the box, so a second
+// "/" is a chance to amend it rather than retype it.
+func (m *viewer) startSearch() {
+	m.searchActive = true
+	m.searchEditing = true
+	m.searchCursor = len(m.searchInput)
+}
+
+// endSearch takes the highlights down along with the prompt.
+func (m *viewer) endSearch() {
+	if !m.searchActive {
+		return
+	}
+	m.searchActive = false
+	m.searchEditing = false
+	if m.searchTerm != "" {
+		m.searchTerm = ""
+		m.rerender()
+	}
+}
+
+// commitSearch lights up the typed term and jumps to the first match at or below
+// the top of the window. It starts from the top, not from searchOrigin, because
+// a fresh search has no match to move on from: a match already in view, or just
+// above the middle row, is the one the user wants. Only when there is none below
+// does it wrap to the top of the diff, so a term that occurs anywhere always
+// shows the user one of its matches.
+func (m *viewer) commitSearch() {
+	m.searchEditing = false
+	m.searchTerm = string(m.searchInput)
+	m.rerender()
+
+	if len(m.matchLines) == 0 {
+		return
+	}
+	for _, line := range m.matchLines {
+		if line >= m.offset {
+			m.centreOn(line)
+			return
+		}
+	}
+	m.centreOn(m.matchLines[0])
+}
+
+// searchOrigin is the position n and p measure from. It is the middle row rather
+// than the top one because that is where a jump leaves its match: measured from
+// the top, the very next "n" would find that same match again and never move on.
+func (m *viewer) searchOrigin() int {
+	return m.offset + m.paneHeight/2
+}
+
+// centreOn puts a line in the middle of the pane, as near to it as the ends of
+// the content allow.
+func (m *viewer) centreOn(line int) {
+	m.offset = line - m.paneHeight/2
+	m.clampScroll()
+	m.clearFrozenFileIdx()
+}
+
+// currentMatch is the match the pane is looking at: the one nearest its middle
+// row, which is where a jump leaves them. It returns -1 when there are none.
+func (m *viewer) currentMatch() int {
+	origin := m.searchOrigin()
+	best, bestGap := -1, 0
+	for i, line := range m.matchLines {
+		gap := line - origin
+		if gap < 0 {
+			gap = -gap
+		}
+		if best == -1 || gap < bestGap {
+			best, bestGap = i, gap
+			continue
+		}
+		// The lines ascend, so once the gap starts growing it keeps growing.
+		break
+	}
+	return best
+}
+
+// jumpToMatch moves to the nearest match on one side of the current position,
+// and stays put when there is none that way. direction is +1 for the next match,
+// -1 for the previous.
+func (m *viewer) jumpToMatch(direction int) {
+	origin := m.searchOrigin()
+	if direction > 0 {
+		for _, line := range m.matchLines {
+			if line > origin {
+				m.centreOn(line)
+				return
+			}
+		}
+		return
+	}
+	for i := len(m.matchLines) - 1; i >= 0; i-- {
+		if m.matchLines[i] < origin {
+			m.centreOn(m.matchLines[i])
+			return
+		}
+	}
+}
+
+func (m *viewer) insertSearchRunes(runes []rune) {
+	m.searchInput = slices.Insert(m.searchInput, m.searchCursor, runes...)
+	m.searchCursor += len(runes)
+}
+
+func (m *viewer) deleteSearchRune(at int) {
+	if at < 0 || at >= len(m.searchInput) {
+		return
+	}
+	m.searchInput = slices.Delete(m.searchInput, at, at+1)
+	if m.searchCursor > at {
+		m.searchCursor--
+	}
+}
+
 // ── Selected location ────────────────────────────────────────────────────────
 
 // selectedLocation falls back to the file at the top of the pane with no line
@@ -312,6 +443,9 @@ func (m *viewer) selectedLocation() (fileName string, lineNum int) {
 
 // handleKey sees only what the app model did not claim first.
 func (m *viewer) handleKey(msg tea.KeyMsg) tea.Cmd {
+	if m.searchEditing {
+		return m.handleSearchEditKey(msg)
+	}
 	if m.lineSelectMode {
 		return m.handleLineSelectKey(msg)
 	}
@@ -342,6 +476,85 @@ func (m *viewer) handleKey(msg tea.KeyMsg) tea.Cmd {
 		m.toggleCollapse()
 	case "C":
 		m.toggleCollapseAll()
+	case "/":
+		m.startSearch()
+	// n and p belong to the search, so they stay unbound until it opens.
+	case "n":
+		if m.searchActive {
+			m.jumpToMatch(1)
+		}
+	case "p":
+		if m.searchActive {
+			m.jumpToMatch(-1)
+		}
+	case "esc":
+		// The app model routes Escape here only while a search is up; without one
+		// it closes the viewer.
+		m.endSearch()
+	}
+	return nil
+}
+
+// handleSearchEditKey runs while the user is typing a term. Every printable
+// character goes into the box — including the ones that are commands elsewhere —
+// so only keys that cannot be typed are left to move the window.
+func (m *viewer) handleSearchEditKey(msg tea.KeyMsg) tea.Cmd {
+	if !msg.Alt {
+		switch msg.Type {
+		case tea.KeyRunes:
+			m.insertSearchRunes(msg.Runes)
+			return nil
+		case tea.KeySpace:
+			m.insertSearchRunes([]rune(" "))
+			return nil
+		}
+	}
+
+	switch msg.String() {
+	case "enter":
+		m.commitSearch()
+	case "esc":
+		m.endSearch()
+
+	// Edit line.
+	case "ctrl+a":
+		m.searchCursor = 0
+	case "ctrl+e":
+		m.searchCursor = len(m.searchInput)
+	case "left":
+		if m.searchCursor > 0 {
+			m.searchCursor--
+		}
+	case "right":
+		if m.searchCursor < len(m.searchInput) {
+			m.searchCursor++
+		}
+	case "backspace":
+		m.deleteSearchRune(m.searchCursor - 1)
+	case "delete":
+		m.deleteSearchRune(m.searchCursor)
+
+	// Window. "<" and ">" are text here, which leaves Home and End as the only
+	// way to reach the ends of the diff without closing the prompt.
+	case "up":
+		m.clearFrozenFileIdx()
+		m.scrollUp(1)
+	case "down":
+		m.clearFrozenFileIdx()
+		m.scrollDown(1)
+	case "pgup":
+		m.clearFrozenFileIdx()
+		m.scrollUp(m.paneHeight)
+	case "pgdown":
+		m.clearFrozenFileIdx()
+		m.scrollDown(m.paneHeight)
+	case "home":
+		m.clearFrozenFileIdx()
+		m.offset = 0
+	case "end":
+		m.clearFrozenFileIdx()
+		m.offset = m.totalLines()
+		m.clampScroll()
 	}
 	return nil
 }
@@ -421,8 +634,68 @@ func (m *viewer) hintPairs() []string {
 		}
 	}
 	return []string{
-		"↑↓", "scroll", "Enter", "select lines", "E", "edit file",
-		"g", "github", "c/C", "collapse", "PgUp/Dn", "page",
-		"</>", "ends", "Q", "quit",
+		"↑↓", "scroll", "Enter", "select lines", "/", "search",
+		"E", "edit file", "g", "github", "c/C", "collapse",
+		"PgUp/Dn", "page", "</>", "ends", "Q", "quit",
 	}
+}
+
+// renderSearchPrompt is the line that stands in for the hints while a search is
+// open: the term on the left, and on the right how it went and what to press
+// next. The whole thing is one row, so both halves get truncated to fit.
+func (m *viewer) renderSearchPrompt(width int) string {
+	// The box states its own needs first; the status takes what is left, and
+	// says less, or nothing at all, when that is not much.
+	left := m.searchInputLine(width)
+	right := m.searchStatus(max(width-lipgloss.Width(left)-2, 0))
+	if right == "" {
+		return left
+	}
+	return joinEnds(left, right, width)
+}
+
+// searchInputLine draws "/term", with a block cursor while it is being typed.
+// A term too long for the line slides left to keep the cursor in view.
+func (m *viewer) searchInputLine(width int) string {
+	runes := append([]rune{'/'}, m.searchInput...)
+	if !m.searchEditing {
+		return theme.SearchPromptStyle.Render(truncateLine(string(runes), width))
+	}
+
+	// The cursor needs a cell of its own when it sits past the last character.
+	runes = append(runes, ' ')
+	cursor := m.searchCursor + 1
+
+	start := 0
+	if cursor >= width {
+		start = cursor - width + 1
+	}
+	end := min(len(runes), start+width)
+
+	return theme.SearchPromptStyle.Render(string(runes[start:cursor])) +
+		theme.SearchCursorStyle.Render(string(runes[cursor:cursor+1])) +
+		theme.SearchPromptStyle.Render(string(runes[cursor+1:end]))
+}
+
+// searchStatus reports how the search went, and which keys act on it. It gives
+// up the keys before the count when the line is narrow.
+func (m *viewer) searchStatus(width int) string {
+	if m.searchEditing {
+		return firstThatFits(width, buildHint("Enter", "search", "Esc", "cancel"))
+	}
+	if m.searchTerm == "" {
+		return firstThatFits(width, buildHint("Esc", "exit search"))
+	}
+
+	keys := buildHint("n/p", "next/prev", "Esc", "exit search")
+	if len(m.matchLines) == 0 {
+		found := theme.ErrorStyle.Render("no matches")
+		return firstThatFits(width, joinHint(found, keys), found)
+	}
+
+	position := m.currentMatch() + 1
+	total := len(m.matchLines)
+	found := theme.HintDescStyle.Render(fmt.Sprintf("match %d of %d", position, total))
+	short := theme.HintDescStyle.Render(fmt.Sprintf("%d/%d", position, total))
+	return firstThatFits(width, joinHint(found, keys), found, short)
 }

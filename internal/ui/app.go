@@ -208,15 +208,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "q", "Q", "ctrl+c":
+	if msg.String() == "ctrl+c" {
 		m.quitting = true
 		return m, tea.Quit
-	case "e", "E":
-		return m.openEditor()
-	case "g":
-		if m.viewer != nil {
-			return m.openGitHub()
+	}
+
+	// The search prompt takes every printable key, so the letter bindings below
+	// stand aside while the user is typing into it.
+	typingSearch := m.viewer != nil && m.viewer.searchEditing
+	if !typingSearch {
+		switch msg.String() {
+		case "q", "Q":
+			m.quitting = true
+			return m, tea.Quit
+		case "e", "E":
+			return m.openEditor()
+		case "g":
+			if m.viewer != nil {
+				return m.openGitHub()
+			}
 		}
 	}
 
@@ -239,10 +249,10 @@ func (m Model) handleViewerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// In line-select mode only Tab exits, since Escape is needed to leave
-// line-select itself.
+// In line-select and search modes only Tab exits, since Escape is needed to
+// leave those modes themselves.
 func isViewerExitKey(v *viewer, msg tea.KeyMsg) bool {
-	if v.lineSelectMode {
+	if v.lineSelectMode || v.searchActive {
 		return msg.String() == "tab"
 	}
 	switch msg.String() {
@@ -377,7 +387,12 @@ func (m Model) View() string {
 
 	statusBar := theme.StatusBarStyle.Width(innerW).Render(bar)
 	// The hint bar's own padding eats two columns, so innerW fits.
-	hint := theme.HintBarStyle.Render(buildHintFit(innerW, hints...))
+	bottom := buildHintFit(innerW, hints...)
+	// An open search takes the bottom line over for its prompt.
+	if m.viewer != nil && m.viewer.searchActive {
+		bottom = m.viewer.renderSearchPrompt(innerW)
+	}
+	hint := theme.HintBarStyle.Render(bottom)
 
 	return lipgloss.JoinVertical(lipgloss.Left, statusBar, panes, hint)
 }

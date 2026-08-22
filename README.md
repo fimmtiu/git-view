@@ -48,6 +48,44 @@ Press Enter to enter line-select mode, which puts a cursor on an individual
 line of the diff so that `E` and `g` can target it. Escape leaves line-select
 mode; Tab still returns to the selector.
 
+## Search
+
+Press `/` in the diff viewer. The help line at the bottom becomes a search box.
+Type a term and press Enter: every occurrence lights up, and the viewer jumps to
+the first match at or below the top of the window — including one already in
+view — and puts it in the middle of the screen, as near to the middle as the ends
+of the diff allow. Escape closes the box and takes the highlights down.
+
+The right of the prompt keeps count: "match 3 of 27" names the match nearest the
+middle of the pane, so it follows you as you jump or scroll.
+
+The term is matched exactly, so case counts. Only the text of the changed files
+is searched: the `@@` hunk headers, the file names, and the line-number gutter
+are part of the viewer rather than the files, and never match.
+
+While you are typing, every printable character goes into the box — including
+`n`, `p`, Space, `<` and `>`, which are commands elsewhere. That leaves `↑` `↓`,
+`PgUp` `PgDn`, and `Home` `End` to move the window under the box. Enter hands
+the letters back, so `n` and `p` then jump between matches. Press `/` again to
+amend the term.
+
+`n` and `p` are measured from the middle row of the pane, not the top, because
+that is where a jump leaves its match — from the top, `n` would keep finding the
+match you are already on. So the next match is always the one below what you are
+looking at: search, jump, scroll up half a page, and `n` brings you back to the
+match you just left.
+
+| Key | While typing the term | Once it is committed |
+|-----|-----------------------|----------------------|
+| Any printable key | Insert it into the term | — |
+| `←` `→` | Move within the term | — |
+| `Ctrl-A` / `Ctrl-E` | Jump to the start / end of the term | — |
+| `Backspace` / `Delete` | Delete a character | — |
+| `Enter` | Search, and jump to the first match | Enter line-select mode |
+| `n` / `p` | — | Jump to the next / previous match |
+| `/` | — | Edit the term again |
+| `Esc` | Close the search | Close the search |
+
 ## Keys
 
 | Key | Commit selector | Diff viewer |
@@ -58,7 +96,8 @@ mode; Tab still returns to the selector.
 | `<` `>` / `Home` `End` | Jump to the ends | Jump to the ends |
 | `Tab` / `Enter` | View the selected diff | `Tab` returns to the selector |
 | `Enter` | — | Enter line-select mode |
-| `Esc` | — | Leave line-select mode, or the viewer |
+| `/` | — | Search the diff |
+| `Esc` | — | Leave the search, line-select mode, or the viewer |
 | `c` / `C` | — | Collapse or expand one file / every file |
 | `E` | Open the repository in your editor | Open the current file, at the selected line |
 | `g` | — | Open the current file on GitHub |

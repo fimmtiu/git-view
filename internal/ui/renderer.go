@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -30,12 +31,15 @@ type renderedDiff struct {
 	text       string
 	fileStarts []int // where each file's blank separator line begins
 	lineMeta   []diffLineMeta
+	matchLines []int // ascending; lines holding a search match
 }
 
 type renderContext struct {
-	paneWidth int
-	meta      []diffLineMeta
-	fileIndex int
+	paneWidth  int
+	meta       []diffLineMeta
+	fileIndex  int
+	searchTerm string
+	matchLines []int
 }
 
 func (rc *renderContext) appendMeta(n int, kind diffLineKind, lineNum int) {
@@ -44,9 +48,24 @@ func (rc *renderContext) appendMeta(n int, kind diffLineKind, lineNum int) {
 	}
 }
 
+// appendContentMeta takes one entry per visual line the content occupies, and
+// notes which of them a search match landed on.
+func (rc *renderContext) appendContentMeta(matched []bool, lineNum int) {
+	for _, hit := range matched {
+		if hit {
+			rc.matchLines = append(rc.matchLines, len(rc.meta))
+		}
+		rc.meta = append(rc.meta, diffLineMeta{
+			kind: diffLineHunkContent, fileIndex: rc.fileIndex, lineNum: lineNum,
+		})
+	}
+}
+
 // renderDiff formats files for display, padding backgrounds out to paneWidth.
-// collapsed is per-file; nil means all expanded.
-func renderDiff(files []diff.File, paneWidth int, collapsed []bool) renderedDiff {
+// collapsed is per-file; nil means all expanded. searchTerm, when set, is lit up
+// wherever it occurs in the changed text — never in the headers, which are not
+// part of the files.
+func renderDiff(files []diff.File, paneWidth int, collapsed []bool, searchTerm string) renderedDiff {
 	if len(files) == 0 {
 		return renderedDiff{}
 	}
@@ -54,7 +73,7 @@ func renderDiff(files []diff.File, paneWidth int, collapsed []bool) renderedDiff
 	var sb strings.Builder
 	lineCount := 0
 	fileStarts := make([]int, 0, len(files))
-	rc := &renderContext{paneWidth: paneWidth}
+	rc := &renderContext{paneWidth: paneWidth, searchTerm: searchTerm}
 
 	for i, f := range files {
 		rc.fileIndex = i
@@ -111,6 +130,7 @@ func renderDiff(files []diff.File, paneWidth int, collapsed []bool) renderedDiff
 		text:       strings.TrimRight(sb.String(), "\n"),
 		fileStarts: fileStarts,
 		lineMeta:   rc.meta,
+		matchLines: rc.matchLines,
 	}
 }
 
@@ -123,7 +143,7 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 	if h.Context != "" {
 		header += " " + h.Context
 	}
-	styled, n := padToWidth(theme.HunkHeaderStyle, header, rc.paneWidth)
+	styled, n, _ := padToWidth(theme.HunkHeaderStyle, header, rc.paneWidth, nil)
 	sb.WriteString(styled)
 	sb.WriteString("\n")
 	rc.appendMeta(n, diffLineNonSelectable, 0)
@@ -139,15 +159,15 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 		case diff.LineRemoved:
 			// Removed lines take no new-file line number, so the gutter is blank.
 			prefix := strings.Repeat(" ", numWidth) + " "
-			styled, n := padToWidth(theme.RemovedStyle, prefix+text, rc.paneWidth)
+			styled, n, matched := padToWidth(theme.RemovedStyle, prefix+text, rc.paneWidth, rc.spans(prefix, text))
 			sb.WriteString(styled)
-			rc.appendMeta(n, diffLineHunkContent, lineNum)
+			rc.appendContentMeta(matched, lineNum)
 			lines += n
 		case diff.LineAdded:
 			prefix := fmt.Sprintf("%*d ", numWidth, lineNum)
-			styled, n := padToWidth(theme.AddedStyle, prefix+text, rc.paneWidth)
+			styled, n, matched := padToWidth(theme.AddedStyle, prefix+text, rc.paneWidth, rc.spans(prefix, text))
 			sb.WriteString(styled)
-			rc.appendMeta(n, diffLineHunkContent, lineNum)
+			rc.appendContentMeta(matched, lineNum)
 			lines += n
 			lineNum++
 		case diff.LineContext:
@@ -156,9 +176,9 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 			// silently became two would push the pane's bottom off-screen and
 			// misplace the line-select cursor.
 			prefix := fmt.Sprintf("%*d ", numWidth, lineNum)
-			wrapped, n := padToWidth(plainStyle, prefix+text, rc.paneWidth)
+			wrapped, n, matched := padToWidth(plainStyle, prefix+text, rc.paneWidth, rc.spans(prefix, text))
 			sb.WriteString(strings.TrimRight(wrapped, " "))
-			rc.appendMeta(n, diffLineHunkContent, lineNum)
+			rc.appendContentMeta(matched, lineNum)
 			lines += n
 			lineNum++
 		}
@@ -167,21 +187,70 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 	return lines
 }
 
+// spans locates the search term within one content line's text. The line-number
+// gutter is not part of the file, so the offsets skip past it and a term that
+// looks like a line number never matches there.
+func (rc *renderContext) spans(prefix, text string) [][2]int {
+	if rc.searchTerm == "" {
+		return nil
+	}
+	return offsetSpans(matchSpans(text, rc.searchTerm), utf8.RuneCountInString(prefix))
+}
+
+// matchSpans returns the non-overlapping [start, end) rune ranges where term
+// occurs in text, ascending. Matching is exact, so case counts.
+func matchSpans(text, term string) [][2]int {
+	if term == "" {
+		return nil
+	}
+	termLen := utf8.RuneCountInString(term)
+
+	var spans [][2]int
+	runePos, bytePos := 0, 0
+	for bytePos < len(text) {
+		i := strings.Index(text[bytePos:], term)
+		if i < 0 {
+			break
+		}
+		runePos += utf8.RuneCountInString(text[bytePos : bytePos+i])
+		spans = append(spans, [2]int{runePos, runePos + termLen})
+		runePos += termLen
+		bytePos += i + len(term)
+	}
+	return spans
+}
+
+func offsetSpans(spans [][2]int, by int) [][2]int {
+	for i := range spans {
+		spans[i][0] += by
+		spans[i][1] += by
+	}
+	return spans
+}
+
 // padToWidth pads and wraps text so the style's background fills every visual
-// line, returning the styled text and how many lines it occupies.
-func padToWidth(style lipgloss.Style, text string, paneWidth int) (string, int) {
+// line. It returns the styled text, how many lines it occupies, and which of
+// those lines a span landed on. spans holds rune ranges over text — the search
+// matches — and may be nil.
+func padToWidth(style lipgloss.Style, text string, paneWidth int, spans [][2]int) (string, int, []bool) {
 	if paneWidth <= 0 {
-		return style.Render(text), 1
+		styled, hit := renderSpans(style, text, spans, 0)
+		return styled, 1, []bool{hit}
 	}
 	textWidth := lipgloss.Width(text)
 	if textWidth <= paneWidth {
 		if textWidth < paneWidth {
 			text += strings.Repeat(" ", paneWidth-textWidth)
 		}
-		return style.Render(text), 1
+		styled, hit := renderSpans(style, text, spans, 0)
+		return styled, 1, []bool{hit}
 	}
 	var parts []string
+	var matched []bool
 	runes := []rune(text)
+	// Where this chunk starts within text, so the spans stay aligned across the
+	// wrap: a match split by one is lit on both lines.
+	offset := 0
 	for len(runes) > 0 {
 		end := 0
 		for end < len(runes) {
@@ -198,9 +267,46 @@ func padToWidth(style lipgloss.Style, text string, paneWidth int) (string, int) 
 		if w := lipgloss.Width(chunk); w < paneWidth {
 			chunk += strings.Repeat(" ", paneWidth-w)
 		}
-		parts = append(parts, style.Render(chunk))
+		styled, hit := renderSpans(style, chunk, spans, offset)
+		parts = append(parts, styled)
+		matched = append(matched, hit)
+		offset += end
 	}
-	return strings.Join(parts, "\n"), len(parts)
+	return strings.Join(parts, "\n"), len(parts), matched
+}
+
+// renderSpans styles chunk, laying the match highlight over the runs of it that
+// fall inside spans. offset is where chunk begins within the line the spans were
+// measured against. It reports whether any of them showed up here.
+func renderSpans(style lipgloss.Style, chunk string, spans [][2]int, offset int) (string, bool) {
+	if len(spans) == 0 {
+		return style.Render(chunk), false
+	}
+
+	runes := []rune(chunk)
+	end := offset + len(runes)
+	var sb strings.Builder
+	hit := false
+	pos := offset
+	for _, span := range spans {
+		if span[1] <= pos {
+			continue
+		}
+		if span[0] >= end {
+			break
+		}
+		lo, hi := max(span[0], pos), min(span[1], end)
+		if lo > pos {
+			sb.WriteString(style.Render(string(runes[pos-offset : lo-offset])))
+		}
+		sb.WriteString(theme.SearchMatchStyle.Render(string(runes[lo-offset : hi-offset])))
+		hit = true
+		pos = hi
+	}
+	if pos < end {
+		sb.WriteString(style.Render(string(runes[pos-offset:])))
+	}
+	return sb.String(), hit
 }
 
 func digitCount(n int) int {
