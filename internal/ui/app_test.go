@@ -539,3 +539,73 @@ func TestCommitRangeLabel(t *testing.T) {
 		t.Errorf("range-to-uncommitted label = %q, want %q", got, "Commits abcd to ????")
 	}
 }
+
+// ── Cursor ───────────────────────────────────────────────────────────────────
+
+// Bubble Tea hides the cursor once, at startup, so every child process that
+// exits is an opportunity for the app to say it again.
+func TestChildProcessExit_HidesTheCursorAgain(t *testing.T) {
+	m := onSelector(t, 5, 100, 30)
+
+	for name, msg := range map[string]tea.Msg{
+		"commit list": commitListMsg{commits: sampleCommits(3), forkPointIdx: -1},
+		"list error":  commitListMsg{err: "fatal: bad object"},
+		"stat":        showStatMsg{hash: "abcd", output: "a stat"},
+		"diff":        diffContentMsg{files: sampleFiles()},
+		"diff error":  diffContentMsg{err: "fatal: bad object"},
+		"child exit":  childExitedMsg{},
+	} {
+		_, cmd := m.Update(msg)
+		if !hidesCursor(cmd) {
+			t.Errorf("%s: the cursor should be hidden again after a child process exits", name)
+		}
+	}
+}
+
+// The commit list also has to keep fetching the preview for the cursor's row.
+func TestChildProcessExit_KeepsTheFollowUpCommand(t *testing.T) {
+	m := onSelector(t, 5, 100, 30)
+	_, cmd := m.Update(commitListMsg{commits: sampleCommits(3), forkPointIdx: -1})
+
+	if _, ok := findMsg[showStatMsg](cmd); !ok {
+		t.Error("loading the commit list should still fetch the first preview")
+	}
+}
+
+// hidesCursor reports whether cmd emits a hide-cursor message, on its own or in
+// a batch.
+func hidesCursor(cmd tea.Cmd) bool {
+	return walkMsgs(cmd, func(msg tea.Msg) bool { return msg == tea.HideCursor() })
+}
+
+// findMsg runs cmd, descending into batches, and returns the first message of
+// type T that it produces.
+func findMsg[T tea.Msg](cmd tea.Cmd) (T, bool) {
+	var found T
+	ok := walkMsgs(cmd, func(msg tea.Msg) bool {
+		typed, is := msg.(T)
+		if is {
+			found = typed
+		}
+		return is
+	})
+	return found, ok
+}
+
+// walkMsgs runs cmd and every command in the batches it produces, stopping as
+// soon as match accepts a message.
+func walkMsgs(cmd tea.Cmd, match func(tea.Msg) bool) bool {
+	if cmd == nil {
+		return false
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, sub := range batch {
+			if walkMsgs(sub, match) {
+				return true
+			}
+		}
+		return false
+	}
+	return match(msg)
+}

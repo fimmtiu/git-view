@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -87,7 +88,7 @@ func renderDiff(files []diff.File, paneWidth int, collapsed []bool, searchTerm s
 		if isCollapsed {
 			indicator = "▶ "
 		}
-		sb.WriteString(theme.FileHeaderStyle.Render(indicator + f.Name + ":"))
+		sb.WriteString(theme.FileHeaderStyle.Render(indicator + sanitize(f.Name) + ":"))
 		sb.WriteString("\n")
 		rc.appendMeta(1, diffLineNonSelectable, 0)
 		lineCount++
@@ -112,7 +113,7 @@ func renderDiff(files []diff.File, paneWidth int, collapsed []bool, searchTerm s
 		case diff.Rename:
 			sb.WriteString("  ")
 			sb.WriteString(theme.RenamedMsgStyle.Render("Renamed to "))
-			sb.WriteString(f.RenameTo)
+			sb.WriteString(sanitize(f.RenameTo))
 			sb.WriteString("\n")
 			rc.appendMeta(1, diffLineNonSelectable, 0)
 			lineCount++
@@ -154,7 +155,7 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 
 	lineNum := h.NewStart
 	for _, line := range h.Lines {
-		text := expandTabs(line.Content)
+		text := expandTabs(sanitize(line.Content))
 		switch line.Type {
 		case diff.LineRemoved:
 			// Removed lines take no new-file line number, so the gutter is blank.
@@ -327,10 +328,23 @@ func expandTabs(s string) string {
 	return strings.ReplaceAll(s, "\t", "    ")
 }
 
+// Escape sequences, and the other control characters that are not text.
+var controlCharRe = regexp.MustCompile(
+	`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b.|[\x00-\x08\x0b-\x1f\x7f]`)
+
+// sanitize drops the control characters out of text that came from git. A diff
+// carries whatever the file holds and a commit message whatever its author
+// wrote, escape sequences included; passed through to the terminal they would
+// drive it rather than show up on it — turning the cursor back on, say, which
+// nothing later turns off.
+func sanitize(s string) string {
+	return controlCharRe.ReplaceAllString(s, "")
+}
+
 func fileNamesFromDiff(files []diff.File) []string {
 	names := make([]string, len(files))
 	for i, f := range files {
-		names[i] = f.Name
+		names[i] = sanitize(f.Name)
 	}
 	return names
 }

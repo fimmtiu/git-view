@@ -474,3 +474,37 @@ func TestFileNamesFromDiff(t *testing.T) {
 		t.Errorf("expected no names for no files, got %v", got)
 	}
 }
+
+func TestSanitize(t *testing.T) {
+	cases := map[string]string{
+		"plain text":              "plain text",
+		"show\x1b[?25hcursor":     "showcursor",
+		"bold \x1b[1mtext\x1b[0m": "bold text",
+		"title\x1b]0;evil\x07end": "titleend",
+		"reset\x1bcnow":           "resetnow",
+		"bell\x07and nul\x00":     "belland nul",
+		"keeps\ttabs":             "keeps\ttabs",
+		"keeps\nnewlines":         "keeps\nnewlines",
+	}
+	for in, want := range cases {
+		if got := sanitize(in); got != want {
+			t.Errorf("sanitize(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRenderDiff_StripsEscapesFromContent(t *testing.T) {
+	files := []diff.File{{
+		Name: "evil\x1b[?25h.go",
+		Type: diff.Normal,
+		Hunks: []diff.Hunk{{
+			NewStart: 1,
+			NewCount: 1,
+			Lines:    []diff.Line{{Type: diff.LineAdded, Content: "x := \"\x1b[?25h\""}},
+		}},
+	}}
+	out := renderDiff(files, 40, nil, "").text
+	if strings.Contains(out, "?25h") {
+		t.Error("a show-cursor sequence in the diff reached the terminal")
+	}
+}

@@ -222,7 +222,7 @@ func buildCommitRows(commits []git.CommitEntry, forkPointIdx int, hasUncommitted
 
 // Plain text; renderRow styles the hash separately on unselected rows.
 func commitLabel(c git.CommitEntry) string {
-	return shortHash(c.Hash) + " " + c.Message
+	return shortHash(c.Hash) + " " + sanitize(c.Message)
 }
 
 // shortHash leaves the uncommitted sentinel intact.
@@ -290,7 +290,7 @@ func (s selector) renderStat() string {
 
 	content := theme.EmptyStateStyle.Render("(no preview)")
 	if s.statOutput != "" {
-		content = renderStatContent(s.statOutput, w)
+		content = renderStatContent(sanitize(s.statOutput), w)
 	}
 	return theme.PaneStyle.Width(w).Height(h).Render(clipLines(content, h))
 }

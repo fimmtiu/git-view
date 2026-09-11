@@ -51,6 +51,10 @@ type statusMsg struct {
 	isErr bool
 }
 
+// childExitedMsg reports that a process running beside the TUI — an editor
+// window, a browser — is finished.
+type childExitedMsg struct{}
+
 // ── Model ────────────────────────────────────────────────────────────────────
 
 // Model owns both screens. The viewer is active exactly when it is non-nil.
@@ -140,6 +144,30 @@ func statusCmd(text string, isErr bool) tea.Cmd {
 	}
 }
 
+// waitForChildCmd reaps a process that was started beside the TUI. Waiting for
+// it in a command keeps the UI responsive, and its exit is what afterChild
+// waits for.
+func waitForChildCmd(cmd *exec.Cmd) tea.Cmd {
+	return func() tea.Msg {
+		_ = cmd.Wait()
+		return childExitedMsg{}
+	}
+}
+
+// afterChild pairs cmd with a fresh hide-cursor sequence, for the messages that
+// mark a child process exiting.
+//
+// Bubble Tea hides the cursor once, at startup, and says so again only when it
+// takes the terminal back from a process it ran for us. Cursor visibility is
+// state of the terminal, not of this program: every child inherits our
+// controlling terminal and can write to /dev/tty whatever its own file
+// descriptors are, and one show-cursor sequence from a git credential helper, a
+// pinentry prompt, or an editor would otherwise leave the cursor blinking at the
+// foot of the screen for the rest of the session.
+func afterChild(cmd tea.Cmd) tea.Cmd {
+	return tea.Batch(tea.HideCursor, cmd)
+}
+
 // ── Dimensions ───────────────────────────────────────────────────────────────
 
 func (m Model) contentWidth() int {
@@ -172,28 +200,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applySize()
 		return m, nil
 
+	// The three git messages below, and childExitedMsg, each mark a child process
+	// that has just exited, so each of them re-hides the cursor.
+
 	case commitListMsg:
 		if msg.err != "" {
 			m.errorMsg = "git error: " + msg.err
-			return m, nil
+			return m, afterChild(nil)
 		}
 		m.errorMsg = ""
 		m.selector.setRows(buildCommitRows(msg.commits, msg.forkPointIdx, msg.hasUncommitted))
-		return m, m.fetchStatForCursor()
+		return m, afterChild(m.fetchStatForCursor())
 
 	case showStatMsg:
 		m.selector.statHash = msg.hash
 		m.selector.statOutput = msg.output
-		return m, nil
+		return m, afterChild(nil)
 
 	case diffContentMsg:
 		if msg.err != "" {
 			m.errorMsg = "git error: " + msg.err
-			return m, nil
+			return m, afterChild(nil)
 		}
 		m.errorMsg = ""
 		m.viewer = newViewer(msg.files, m.contentWidth(), m.viewerHeight())
-		return m, nil
+		return m, afterChild(nil)
+
+	case childExitedMsg:
+		return m, afterChild(nil)
 
 	case statusMsg:
 		m.status = msg.text
@@ -339,7 +373,7 @@ func (m Model) openEditor() (tea.Model, tea.Cmd) {
 		if err := cmd.Start(); err != nil {
 			return m, statusCmd(fmt.Sprintf("editor failed: %s", err), true)
 		}
-		return m, nil
+		return m, waitForChildCmd(cmd)
 	}
 	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
@@ -358,10 +392,13 @@ func (m Model) openGitHub() (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, statusCmd(err.Error(), true)
 	}
-	if err := exec.Command("open", url).Start(); err != nil {
+	cmd := exec.Command("open", url)
+	if err := cmd.Start(); err != nil {
 		return m, statusCmd(fmt.Sprintf("open failed: %s", err), true)
 	}
-	return m, statusCmd("opened "+url, false)
+	// The "opened" message stands until the next keystroke clears it; only the
+	// wait is deferred, and its message leaves the status bar alone.
+	return m, tea.Batch(statusCmd("opened "+url, false), waitForChildCmd(cmd))
 }
 
 // ── View ─────────────────────────────────────────────────────────────────────
