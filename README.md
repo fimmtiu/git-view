@@ -1,12 +1,9 @@
 # git-view
 
-A full-screen terminal viewer for git diffs, extracted from the Diffs pane of
-[code-factory](https://github.com/fimmtiu/code-factory).
+A full-screen terminal viewer for git commits and diffs, intended to make reading code changes and browsing commit
+history from a terminal a pleasant experience.
 
-It cleans up raw `git diff` output for reading on a terminal: file headers
-collapse to a bold filename, `@@` hunk headers lose their line-number ranges,
-`+`/`-` prefixes become full-width background colours, and added lines carry
-line numbers in a left-hand gutter.
+![Screenshot of the diff viewer](img/diff-view.png)
 
 ## Install
 
@@ -24,67 +21,33 @@ Run it inside a git repository. It takes no arguments.
 
 ## Commit selector
 
-The app opens on the commit selector. The left pane lists the most recent 100
-commits on the current branch, newest first, and the right pane shows
-`git show --stat` for whichever one the cursor is on.
+The app opens on the commit selector. The left pane lists the most recent 100 commits on the current branch, newest
+first, and the right pane shows `git show --stat` for whichever one the cursor is on.
 
-- Uncommitted changes appear at the top as `???? Uncommitted changes`. This
-  covers modified tracked files and untracked ones, which show as new files.
-  Ignored files and staged-only changes are left out.
-- A horizontal rule marks where the current branch diverged from `main` or
-  `master`, separating your commits from the ones you branched off.
-- Merge commits are omitted.
+- Uncommitted changes appear at the top as `???? Uncommitted changes`. This covers modified tracked files and untracked
+  ones, which show as new files. Ignored files and staged changes are left out.
+- A horizontal rule marks where the current branch diverged from `main` or `master`, separating your commits from the
+  ones you branched off.
+- Merge commits are omitted. Nobody likes you, merge commits. Go away.
 
-Move the cursor to pick a single commit, or hold Shift while moving to extend
-the selection into a range. Press Tab or Enter to read the diff for that
-selection; the diff runs from the parent of the oldest selected commit through
-the newest, so the whole range's changes are included.
+Move the cursor to pick a single commit, or hold `Shift` while moving to select a range of commits. Press `Tab` or
+`Enter` to read the diff for that selection.
 
 ## Diff viewer
 
-Tab or Escape returns to the commit selector, with your selection intact.
+`Tab` or `Escape` returns to the commit selector, with your selection intact.
 
-Press Enter to enter line-select mode, which puts a cursor on an individual
-line of the diff so that `E` and `g` can target it. Escape leaves line-select
-mode; Tab still returns to the selector.
+Press `Enter` to enter line-select mode, which puts a cursor on an individual line of the diff so that `E` and `g` can
+target it. `Escape` leaves line-select mode; `Tab` still returns to the selector.
 
 ## Search
 
-Press `/` in the diff viewer. The help line at the bottom becomes a search box.
-Type a term and press Enter: every occurrence lights up, and the viewer jumps to
-the first match at or below the top of the window — including one already in
-view — and puts it in the middle of the screen, as near to the middle as the ends
-of the diff allow. Escape closes the box and takes the highlights down.
+Press `/` in the diff viewer. The help line at the bottom becomes a search box where you can type a term and press
+`Enter`, just like `less`. Every occurrence lights up, and the viewer jumps to the first match. Press `Escape` to exit
+search mode.
 
-The right of the prompt keeps count: "match 3 of 27" names the match nearest the
-middle of the pane, so it follows you as you jump or scroll.
-
-The term is matched exactly, so case counts. Only the text of the changed files
-is searched: the `@@` hunk headers, the file names, and the line-number gutter
-are part of the viewer rather than the files, and never match.
-
-While you are typing, every printable character goes into the box — including
-`n`, `p`, Space, `<` and `>`, which are commands elsewhere. That leaves `↑` `↓`,
-`PgUp` `PgDn`, and `Home` `End` to move the window under the box. Enter hands
-the letters back, so `n` and `p` then jump between matches. Press `/` again to
-amend the term.
-
-`n` and `p` are measured from the middle row of the pane, not the top, because
-that is where a jump leaves its match — from the top, `n` would keep finding the
-match you are already on. So the next match is always the one below what you are
-looking at: search, jump, scroll up half a page, and `n` brings you back to the
-match you just left.
-
-| Key | While typing the term | Once it is committed |
-|-----|-----------------------|----------------------|
-| Any printable key | Insert it into the term | — |
-| `←` `→` | Move within the term | — |
-| `Ctrl-A` / `Ctrl-E` | Jump to the start / end of the term | — |
-| `Backspace` / `Delete` | Delete a character | — |
-| `Enter` | Search, and jump to the first match | Enter line-select mode |
-| `n` / `p` | — | Jump to the next / previous match |
-| `/` | — | Edit the term again |
-| `Esc` | Close the search | Close the search |
+The term is matched exactly, so case counts. Only the text of the changed files is searched: the `@@` hunk headers, the
+file names, and the line-number gutter are part of the viewer rather than the files, and never match.
 
 ## Keys
 
@@ -119,5 +82,4 @@ they exit.
 
 `g` opens `https://github.com/<owner>/<repo>/blob/<ref>/<path>` via the `open`
 command, appending `#L<line>` when a line is selected. The ref is the current
-branch, or the HEAD commit hash when the working tree is on a detached HEAD —
-either way, the commit must have been pushed for the link to resolve.
+branch, or the HEAD commit hash when the working tree is on a detached HEAD.
