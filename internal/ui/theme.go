@@ -53,10 +53,9 @@ var (
 	colourRemoved    = lipgloss.AdaptiveColor{Light: "224", Dark: "52"}
 	colourDeleted    = lipgloss.AdaptiveColor{Light: "88", Dark: "167"}
 	colourRenamed    = lipgloss.AdaptiveColor{Light: "25", Dark: "75"}
-	// A search match lands on any of three backgrounds — added, removed, or the
-	// terminal's own — so it sets both of its colours and keeps them far from all
-	// three. Its foreground stays dark, because the two palettes disagree about
-	// the default one.
+	// A search match can sit on the added, removed, or terminal background, so
+	// it sets both colours, far from all three. The foreground is dark in both
+	// palettes because their default foregrounds differ.
 	colourMatch   = lipgloss.AdaptiveColor{Light: "220", Dark: "214"}
 	colourOnMatch = lipgloss.AdaptiveColor{Light: "16", Dark: "16"}
 )

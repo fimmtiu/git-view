@@ -30,7 +30,6 @@ func main() {
 	}
 }
 
-// Returns errors rather than exiting so main owns the exit path.
 func run(args []string) error {
 	if len(args) > 0 {
 		fmt.Print(usage)
@@ -62,17 +61,10 @@ const (
 	restoreCursorSeq = "\x1b8"
 )
 
-// saveCursorPos notes where the cursor is and returns a function that moves it
-// back there.
-//
-// The alternate screen is meant to make this unnecessary. A terminal that
-// leaves it restores the main screen, and is supposed to restore the cursor
-// with it. Some terminals bring back the contents only, so the shell draws its
-// next prompt at the top of the screen, on top of the history that just came
-// back. Saving the position and setting it again makes the result the same
-// everywhere: the history stays where it was, and the prompt comes out where
-// the command was typed. A terminal that does restore the cursor gets the same
-// coordinates twice, which changes nothing.
+// saveCursorPos saves the cursor position and returns a function that restores
+// it. Some terminals restore the screen contents but not the cursor when they
+// leave the alternate screen, so the shell draws its next prompt at the top of
+// the screen, over the restored history.
 func saveCursorPos(out *os.File) func() {
 	if info, err := out.Stat(); err != nil || info.Mode()&os.ModeCharDevice == 0 {
 		return func() {} // not a terminal, so there is no cursor to move

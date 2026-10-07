@@ -8,7 +8,7 @@ import (
 	"github.com/fimmtiu/git-view/internal/git"
 )
 
-// Enough to pick a range to review; the full history never is needed.
+// Enough history to pick a range to review.
 const maxCommits = 100
 
 // A separator row is the non-selectable divider above the fork-point commit.

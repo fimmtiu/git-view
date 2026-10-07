@@ -144,9 +144,7 @@ func statusCmd(text string, isErr bool) tea.Cmd {
 	}
 }
 
-// waitForChildCmd reaps a process that was started beside the TUI. Waiting for
-// it in a command keeps the UI responsive, and its exit is what afterChild
-// waits for.
+// waitForChildCmd reaps a process started beside the TUI without blocking the UI.
 func waitForChildCmd(cmd *exec.Cmd) tea.Cmd {
 	return func() tea.Msg {
 		_ = cmd.Wait()
@@ -154,16 +152,10 @@ func waitForChildCmd(cmd *exec.Cmd) tea.Cmd {
 	}
 }
 
-// afterChild pairs cmd with a fresh hide-cursor sequence, for the messages that
-// mark a child process exiting.
-//
-// Bubble Tea hides the cursor once, at startup, and says so again only when it
-// takes the terminal back from a process it ran for us. Cursor visibility is
-// state of the terminal, not of this program: every child inherits our
-// controlling terminal and can write to /dev/tty whatever its own file
-// descriptors are, and one show-cursor sequence from a git credential helper, a
-// pinentry prompt, or an editor would otherwise leave the cursor blinking at the
-// foot of the screen for the rest of the session.
+// afterChild pairs cmd with a hide-cursor sequence, for messages that mark a
+// child process exiting. Bubble Tea hides the cursor only at startup and after
+// tea.ExecProcess, but any child (a credential helper, pinentry, an editor) can
+// write a show-cursor sequence to /dev/tty.
 func afterChild(cmd tea.Cmd) tea.Cmd {
 	return tea.Batch(tea.HideCursor, cmd)
 }
@@ -396,8 +388,8 @@ func (m Model) openGitHub() (tea.Model, tea.Cmd) {
 	if err := cmd.Start(); err != nil {
 		return m, statusCmd(fmt.Sprintf("open failed: %s", err), true)
 	}
-	// The "opened" message stands until the next keystroke clears it; only the
-	// wait is deferred, and its message leaves the status bar alone.
+	// childExitedMsg leaves the status bar alone, so "opened" stays until the
+	// next key.
 	return m, tea.Batch(statusCmd("opened "+url, false), waitForChildCmd(cmd))
 }
 

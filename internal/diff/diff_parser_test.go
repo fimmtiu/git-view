@@ -328,7 +328,6 @@ func TestParseFileSection_EmptyInput(t *testing.T) {
 }
 
 func TestParse_SkipsEmptySections(t *testing.T) {
-	// A blank section between two valid ones should be dropped silently.
 	raw := `diff --git a/first.go b/first.go
 index abc1234..def5678 100644
 --- a/first.go

@@ -542,8 +542,8 @@ func TestCommitRangeLabel(t *testing.T) {
 
 // ── Cursor ───────────────────────────────────────────────────────────────────
 
-// Bubble Tea hides the cursor once, at startup, so every child process that
-// exits is an opportunity for the app to say it again.
+// Bubble Tea hides the cursor only at startup, so the app hides it again after
+// each child process exits.
 func TestChildProcessExit_HidesTheCursorAgain(t *testing.T) {
 	m := onSelector(t, 5, 100, 30)
 

@@ -19,9 +19,8 @@ func stripAnsi(s string) string {
 	return ansiEscapeRe.ReplaceAllString(s, "")
 }
 
-// viewer is the scrollable diff pane. The app model owns the status bar and
-// passes in content-pane dimensions only, so the viewer never sees the full
-// terminal size.
+// viewer is the scrollable diff pane. Its dimensions cover the content pane
+// only; the app model owns the status bar.
 type viewer struct {
 	text       string
 	fileStarts []int
@@ -51,7 +50,6 @@ type viewer struct {
 	matchLines    []int
 }
 
-// paneWidth and paneHeight cover the content area only.
 func newViewer(files []diff.File, paneWidth, paneHeight int) *viewer {
 	m := &viewer{
 		paneWidth:     paneWidth,
@@ -329,12 +327,10 @@ func (m *viewer) endSearch() {
 	}
 }
 
-// commitSearch lights up the typed term and jumps to the first match at or below
-// the top of the window. It starts from the top, not from searchOrigin, because
-// a fresh search has no match to move on from: a match already in view, or just
-// above the middle row, is the one the user wants. Only when there is none below
-// does it wrap to the top of the diff, so a term that occurs anywhere always
-// shows the user one of its matches.
+// commitSearch highlights the typed term and jumps to the first match at or
+// below the top of the pane, wrapping to the first match in the diff if none is
+// below. It starts from the top rather than searchOrigin so that a match already
+// in view is chosen.
 func (m *viewer) commitSearch() {
 	m.searchEditing = false
 	m.searchTerm = string(m.searchInput)
@@ -352,9 +348,8 @@ func (m *viewer) commitSearch() {
 	m.centreOn(m.matchLines[0])
 }
 
-// searchOrigin is the position n and p measure from. It is the middle row rather
-// than the top one because that is where a jump leaves its match: measured from
-// the top, the very next "n" would find that same match again and never move on.
+// searchOrigin is the position n and p measure from. It is the middle row
+// because centreOn leaves a match there, so the next "n" moves past it.
 func (m *viewer) searchOrigin() int {
 	return m.offset + m.paneHeight/2
 }
@@ -367,8 +362,8 @@ func (m *viewer) centreOn(line int) {
 	m.clearFrozenFileIdx()
 }
 
-// currentMatch is the match the pane is looking at: the one nearest its middle
-// row, which is where a jump leaves them. It returns -1 when there are none.
+// currentMatch returns the index of the match nearest the pane's middle row, or
+// -1 if there are none.
 func (m *viewer) currentMatch() int {
 	origin := m.searchOrigin()
 	best, bestGap := -1, 0
@@ -495,9 +490,8 @@ func (m *viewer) handleKey(msg tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// handleSearchEditKey runs while the user is typing a term. Every printable
-// character goes into the box — including the ones that are commands elsewhere —
-// so only keys that cannot be typed are left to move the window.
+// handleSearchEditKey runs while the user types a term. All printable
+// characters go into the box, so only non-printable keys scroll the pane.
 func (m *viewer) handleSearchEditKey(msg tea.KeyMsg) tea.Cmd {
 	if !msg.Alt {
 		switch msg.Type {
@@ -534,8 +528,7 @@ func (m *viewer) handleSearchEditKey(msg tea.KeyMsg) tea.Cmd {
 	case "delete":
 		m.deleteSearchRune(m.searchCursor)
 
-	// Window. "<" and ">" are text here, which leaves Home and End as the only
-	// way to reach the ends of the diff without closing the prompt.
+	// Scrolling. "<" and ">" are text here, so only Home and End reach the ends.
 	case "up":
 		m.clearFrozenFileIdx()
 		m.scrollUp(1)
@@ -640,12 +633,9 @@ func (m *viewer) hintPairs() []string {
 	}
 }
 
-// renderSearchPrompt is the line that stands in for the hints while a search is
-// open: the term on the left, and on the right how it went and what to press
-// next. The whole thing is one row, so both halves get truncated to fit.
+// renderSearchPrompt replaces the hint bar while a search is open: the term on
+// the left, and the status in the remaining width on the right.
 func (m *viewer) renderSearchPrompt(width int) string {
-	// The box states its own needs first; the status takes what is left, and
-	// says less, or nothing at all, when that is not much.
 	left := m.searchInputLine(width)
 	right := m.searchStatus(max(width-lipgloss.Width(left)-2, 0))
 	if right == "" {
@@ -677,8 +667,8 @@ func (m *viewer) searchInputLine(width int) string {
 		theme.SearchPromptStyle.Render(string(runes[cursor+1:end]))
 }
 
-// searchStatus reports how the search went, and which keys act on it. It gives
-// up the keys before the count when the line is narrow.
+// searchStatus reports the search result and the keys that act on it, dropping
+// the keys first when the line is narrow.
 func (m *viewer) searchStatus(width int) string {
 	if m.searchEditing {
 		return firstThatFits(width, buildHint("Enter", "search", "Esc", "cancel"))

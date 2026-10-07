@@ -25,9 +25,8 @@ func TestSaveCursorPos_SkipsAFileThatIsNotATerminal(t *testing.T) {
 	}
 }
 
-// The pair has to be DECSC and DECRC. Anything that moves the cursor to a row
-// of its own choosing would either scroll the screen or overwrite a line of
-// the history the prompt is meant to follow.
+// The pair must be DECSC and DECRC. Other cursor-positioning sequences would
+// scroll the screen or overwrite the restored history.
 func TestCursorSequences_AreSaveAndRestore(t *testing.T) {
 	if saveCursorSeq != "\x1b7" {
 		t.Errorf("save = %q, want %q", saveCursorSeq, "\x1b7")

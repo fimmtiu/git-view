@@ -183,11 +183,9 @@ func untrackedFiles(repoRoot string) []string {
 	return files
 }
 
-// workingTreeDiff runs a diff command that reads the working tree, with the
-// untracked files included. They get marked intent-to-add in a throwaway copy of
-// the index, which makes git report them as new files; the real index is never
-// touched. If any part of that setup fails, the diff still runs, but it shows
-// tracked files only.
+// workingTreeDiff runs a working-tree diff that includes untracked files by
+// marking them intent-to-add in a scratch copy of the index. If that setup
+// fails, the diff shows tracked files only.
 func workingTreeDiff(repoRoot string, args ...string) (string, error) {
 	untracked := untrackedFiles(repoRoot)
 	if len(untracked) == 0 {

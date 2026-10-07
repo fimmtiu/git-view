@@ -172,10 +172,8 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 			lines += n
 			lineNum++
 		case diff.LineContext:
-			// Wrapped here rather than left to lipgloss at render time: the viewer
-			// counts one line of this text as one screen row, so a line that
-			// silently became two would push the pane's bottom off-screen and
-			// misplace the line-select cursor.
+			// Wrapped here, not by lipgloss at render time, because the viewer
+			// counts each line of this text as one screen row.
 			prefix := fmt.Sprintf("%*d ", numWidth, lineNum)
 			wrapped, n, matched := padToWidth(plainStyle, prefix+text, rc.paneWidth, rc.spans(prefix, text))
 			sb.WriteString(strings.TrimRight(wrapped, " "))
@@ -188,9 +186,8 @@ func renderHunk(sb *strings.Builder, h diff.Hunk, rc *renderContext) int {
 	return lines
 }
 
-// spans locates the search term within one content line's text. The line-number
-// gutter is not part of the file, so the offsets skip past it and a term that
-// looks like a line number never matches there.
+// spans locates the search term in text, offset past the line-number gutter so
+// the gutter itself never matches.
 func (rc *renderContext) spans(prefix, text string) [][2]int {
 	if rc.searchTerm == "" {
 		return nil
@@ -230,9 +227,8 @@ func offsetSpans(spans [][2]int, by int) [][2]int {
 }
 
 // padToWidth pads and wraps text so the style's background fills every visual
-// line. It returns the styled text, how many lines it occupies, and which of
-// those lines a span landed on. spans holds rune ranges over text — the search
-// matches — and may be nil.
+// line. It returns the styled text, its line count, and which lines a span
+// landed on. spans are search-match rune ranges over text, and may be nil.
 func padToWidth(style lipgloss.Style, text string, paneWidth int, spans [][2]int) (string, int, []bool) {
 	if paneWidth <= 0 {
 		styled, hit := renderSpans(style, text, spans, 0)
@@ -332,11 +328,9 @@ func expandTabs(s string) string {
 var controlCharRe = regexp.MustCompile(
 	`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b.|[\x00-\x08\x0b-\x1f\x7f]`)
 
-// sanitize drops the control characters out of text that came from git. A diff
-// carries whatever the file holds and a commit message whatever its author
-// wrote, escape sequences included; passed through to the terminal they would
-// drive it rather than show up on it — turning the cursor back on, say, which
-// nothing later turns off.
+// sanitize strips control characters from text that came from git. Diffs and
+// commit messages can contain escape sequences that would otherwise control the
+// terminal, for example by showing the cursor.
 func sanitize(s string) string {
 	return controlCharRe.ReplaceAllString(s, "")
 }
