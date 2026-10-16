@@ -36,6 +36,8 @@ type commitListMsg struct {
 	forkPointIdx   int
 	hasUncommitted bool
 	err            string
+	branchChanges  bool
+	findingsExist  bool
 }
 
 type showStatMsg struct {
@@ -83,6 +85,8 @@ type Model struct {
 	editor editor.Editor
 	// Recorded so the E key can explain itself rather than do nothing.
 	editorFound bool
+
+	review reviewState
 
 	// Sticky failure from loading commits or a diff.
 	errorMsg string
@@ -269,6 +273,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case jobExitedMsg:
+		return m.handleJobExited(msg)
+
+	case dialogTickMsg:
+		return m.handleDialogTick(msg)
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -279,7 +289,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		m.quitting = true
+		if m.review.task != nil {
+			m.cancelTask()
+		}
 		return m, tea.Quit
+	}
+
+	if m.review.task != nil || m.review.notice != nil {
+		return m.handleDialogKey(msg)
 	}
 
 	// The search prompt takes every printable key, so the letter bindings below
@@ -357,6 +374,10 @@ func (m Model) handleSelectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.selector.extendRange(m.selector.listHeight, 1)
 	case "tab", "enter":
 		return m.openViewer()
+	case "C":
+		return m.startCodeReview()
+	case "F":
+		return m.startFix()
 	default:
 		return m, nil
 	}
@@ -454,7 +475,7 @@ func (m Model) View() string {
 	} else {
 		bar = m.renderSelectorStatusBar(innerW)
 		panes = m.selector.renderPanes()
-		hints = m.selector.hintPairs()
+		hints = m.selector.hintPairs(reviewKeys{})
 	}
 
 	statusBar := theme.StatusBarStyle.Width(innerW).Render(bar)
@@ -467,6 +488,12 @@ func (m Model) View() string {
 	hint := theme.HintBarStyle.Render(bottom)
 
 	full := lipgloss.JoinVertical(lipgloss.Left, statusBar, panes, hint)
+
+	if m.review.task != nil || m.review.notice != nil {
+		if v, ok := m.dialogView(); ok {
+			full = overlayCenter(full, renderDialog(v, m.width), m.width, m.height)
+		}
+	}
 	if m.notifText != "" {
 		full = overlayBottomRight(full, theme.NotifStyle.Render(m.notifText), m.width, hintBarRows)
 	}
