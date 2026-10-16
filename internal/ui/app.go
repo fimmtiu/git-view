@@ -90,6 +90,9 @@ type Model struct {
 	status      string
 	statusIsErr bool
 
+	notifText string // current notification text; empty = none visible
+	notifID   int    // incremented on each new notification to expire old timers
+
 	quitting bool
 }
 
@@ -250,6 +253,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case statusMsg:
 		m.status = msg.text
 		m.statusIsErr = msg.isErr
+		return m, nil
+
+	case notifMsg:
+		m.notifID++
+		m.notifText = msg.text
+		id := m.notifID
+		return m, tea.Tick(notifDuration, func(time.Time) tea.Msg {
+			return clearNotifMsg{id: id}
+		})
+
+	case clearNotifMsg:
+		if msg.id == m.notifID {
+			m.notifText = ""
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -449,7 +466,11 @@ func (m Model) View() string {
 	}
 	hint := theme.HintBarStyle.Render(bottom)
 
-	return lipgloss.JoinVertical(lipgloss.Left, statusBar, panes, hint)
+	full := lipgloss.JoinVertical(lipgloss.Left, statusBar, panes, hint)
+	if m.notifText != "" {
+		full = overlayBottomRight(full, theme.NotifStyle.Render(m.notifText), m.width, hintBarRows)
+	}
+	return full
 }
 
 func (m Model) renderSelectorStatusBar(width int) string {

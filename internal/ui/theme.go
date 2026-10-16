@@ -11,6 +11,7 @@ type Theme struct {
 	HintBarStyle    lipgloss.Style
 	ErrorStyle      lipgloss.Style
 	LabelBoldStyle  lipgloss.Style
+	NotifStyle      lipgloss.Style
 
 	// Diff content.
 	HunkHeaderStyle lipgloss.Style
@@ -48,6 +49,7 @@ var (
 	colourSuccess    = lipgloss.AdaptiveColor{Light: "28", Dark: "77"}
 	colourSubtle     = lipgloss.AdaptiveColor{Light: "243", Dark: "240"}
 	colourDanger     = lipgloss.AdaptiveColor{Light: "124", Dark: "167"}
+	colourWarning    = lipgloss.AdaptiveColor{Light: "166", Dark: "214"}
 	colourHunkHeader = lipgloss.AdaptiveColor{Light: "189", Dark: "24"}
 	colourAdded      = lipgloss.AdaptiveColor{Light: "194", Dark: "22"}
 	colourRemoved    = lipgloss.AdaptiveColor{Light: "224", Dark: "52"}
@@ -71,11 +73,16 @@ var theme = Theme{
 	EmptyStateStyle: lipgloss.NewStyle().
 		Foreground(colourSubtle).
 		Italic(true),
-	HintKeyStyle:    lipgloss.NewStyle().Foreground(colourMuted).Bold(true),
-	HintDescStyle:   lipgloss.NewStyle().Foreground(colourMuted),
-	HintBarStyle:    lipgloss.NewStyle().Padding(0, 1),
-	ErrorStyle:      lipgloss.NewStyle().Foreground(colourDanger),
-	LabelBoldStyle:  lipgloss.NewStyle().Bold(true),
+	HintKeyStyle:   lipgloss.NewStyle().Foreground(colourMuted).Bold(true),
+	HintDescStyle:  lipgloss.NewStyle().Foreground(colourMuted),
+	HintBarStyle:   lipgloss.NewStyle().Padding(0, 1),
+	ErrorStyle:     lipgloss.NewStyle().Foreground(colourDanger),
+	LabelBoldStyle: lipgloss.NewStyle().Bold(true),
+	NotifStyle: lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colourWarning).
+		Bold(true).
+		Padding(0, 2),
 	HunkHeaderStyle: lipgloss.NewStyle().Background(colourHunkHeader),
 	AddedStyle:      lipgloss.NewStyle().Background(colourAdded),
 	RemovedStyle:    lipgloss.NewStyle().Background(colourRemoved),
