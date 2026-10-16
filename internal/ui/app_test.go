@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -40,10 +41,11 @@ func TestInit_LoadsTheCommitList(t *testing.T) {
 		t.Fatal("Init should start the commit-list fetch")
 	}
 	// /tmp/repo is not a repository, so the fetch must report an error rather
-	// than hang or panic.
-	msg, ok := cmd().(commitListMsg)
+	// than hang or panic. The fetch comes first in the batch, so findMsg stops
+	// before it runs the refresh timer.
+	msg, ok := findMsg[commitListMsg](cmd)
 	if !ok {
-		t.Fatalf("expected a commitListMsg, got %T", cmd())
+		t.Fatal("expected a commitListMsg")
 	}
 	if msg.err == "" {
 		t.Error("expected an error for a non-repository path")
@@ -333,6 +335,72 @@ func TestReturningToTheSelectorKeepsTheSelection(t *testing.T) {
 
 	if back.selector.cursor != cursor {
 		t.Errorf("cursor = %d after returning, want %d", back.selector.cursor, cursor)
+	}
+}
+
+// ── Refresh ──────────────────────────────────────────────────────────────────
+
+// isFetchCommitsCmd runs cmd, which must not contain the refresh timer.
+func isFetchCommitsCmd(cmd tea.Cmd) bool {
+	_, ok := findMsg[commitListMsg](cmd)
+	return ok
+}
+
+func TestRefreshTick_ReloadsTheCommitList(t *testing.T) {
+	_, cmd := onSelector(t, 5, 100, 30).Update(refreshTickMsg{})
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Fatalf("expected a fetch and the next tick, got %#v", cmd())
+	}
+	if !isFetchCommitsCmd(batch[0]) {
+		t.Error("a tick on the selector should reload the commit list")
+	}
+}
+
+func TestRefreshTick_SkipsTheFetchInTheViewer(t *testing.T) {
+	m := onViewer(t, sampleFiles(), 100, 30)
+	m.refreshInterval = time.Millisecond
+	_, cmd := m.Update(refreshTickMsg{})
+	if cmd == nil {
+		t.Fatal("the tick should schedule the next tick")
+	}
+	if _, isBatch := cmd().(tea.BatchMsg); isBatch {
+		t.Error("a tick in the viewer should only schedule the next tick")
+	}
+}
+
+func TestClosingTheViewerReloadsTheCommitList(t *testing.T) {
+	_, cmd := send(t, onViewer(t, sampleFiles(), 100, 30), "tab")
+	if !isFetchCommitsCmd(cmd) {
+		t.Error("closing the viewer should reload the commit list")
+	}
+}
+
+func TestRefresh_KeepsTheSelectionOnTheSameCommits(t *testing.T) {
+	m := onSelector(t, 10, 100, 30)
+	m, _ = send(t, m, "down")
+	extended, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftDown})
+	m = extended.(Model)
+	start, end, _ := m.selector.selectedRange()
+
+	// A new commit and uncommitted changes push the selection down two rows.
+	commits := append([]git.CommitEntry{{Hash: "fedcba9876", Message: "new"}}, sampleCommits(10)...)
+	refreshed, _ := m.Update(commitListMsg{commits: commits, forkPointIdx: -1, hasUncommitted: true})
+
+	gotStart, gotEnd, _ := refreshed.(Model).selector.selectedRange()
+	if gotStart.Hash != start.Hash || gotEnd.Hash != end.Hash {
+		t.Errorf("selection = %s..%s, want %s..%s", gotStart.Hash, gotEnd.Hash, start.Hash, end.Hash)
+	}
+}
+
+func TestRefresh_RefetchesTheUncommittedPreview(t *testing.T) {
+	m := onSelector(t, 0, 100, 30)
+	loaded, _ := m.Update(commitListMsg{forkPointIdx: -1, hasUncommitted: true})
+	withStat, _ := loaded.Update(showStatMsg{hash: git.UncommittedHash, output: "old stat"})
+
+	_, cmd := withStat.Update(commitListMsg{forkPointIdx: -1, hasUncommitted: true})
+	if _, ok := findMsg[showStatMsg](cmd); !ok {
+		t.Error("a refresh should fetch the uncommitted changes' preview again")
 	}
 }
 

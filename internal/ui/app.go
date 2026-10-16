@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -24,6 +25,9 @@ const (
 )
 
 const paneSideBorders = 2
+
+// How often the selector reloads the commit list.
+const defaultRefreshInterval = 60 * time.Second
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
@@ -51,6 +55,9 @@ type statusMsg struct {
 	isErr bool
 }
 
+// refreshTickMsg asks for the commit list to be reloaded.
+type refreshTickMsg struct{}
+
 // childExitedMsg reports that a process running beside the TUI — an editor
 // window, a browser — is finished.
 type childExitedMsg struct{}
@@ -71,6 +78,8 @@ type Model struct {
 	viewStart git.CommitEntry
 	viewEnd   git.CommitEntry
 
+	refreshInterval time.Duration
+
 	editor editor.Editor
 	// Recorded so the E key can explain itself rather than do nothing.
 	editorFound bool
@@ -87,15 +96,16 @@ type Model struct {
 func NewModel(repoRoot, repoLabel string) Model {
 	ed, found := editor.Resolve()
 	return Model{
-		repoRoot:    repoRoot,
-		repoLabel:   repoLabel,
-		editor:      ed,
-		editorFound: found,
+		repoRoot:        repoRoot,
+		repoLabel:       repoLabel,
+		refreshInterval: defaultRefreshInterval,
+		editor:          ed,
+		editorFound:     found,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return fetchCommitsCmd(m.repoRoot)
+	return tea.Batch(fetchCommitsCmd(m.repoRoot), refreshTickCmd(m.refreshInterval))
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -113,6 +123,10 @@ func fetchCommitsCmd(repoRoot string) tea.Cmd {
 			hasUncommitted: hasUncommitted,
 		}
 	}
+}
+
+func refreshTickCmd(interval time.Duration) tea.Cmd {
+	return tea.Tick(interval, func(time.Time) tea.Msg { return refreshTickMsg{} })
 }
 
 func fetchStatCmd(repoRoot, hash string) tea.Cmd {
@@ -202,6 +216,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.errorMsg = ""
 		m.selector.setRows(buildCommitRows(msg.commits, msg.forkPointIdx, msg.hasUncommitted))
+		// A commit's stat never changes, but the working tree's can.
+		if m.selector.statHash == git.UncommittedHash {
+			m.selector.statHash = ""
+		}
 		return m, afterChild(m.fetchStatForCursor())
 
 	case showStatMsg:
@@ -220,6 +238,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case childExitedMsg:
 		return m, afterChild(nil)
+
+	// The viewer does not show the commit list, and closing it reloads the list
+	// anyway, so the tick skips the fetch while the viewer is open.
+	case refreshTickMsg:
+		if m.viewer != nil {
+			return m, refreshTickCmd(m.refreshInterval)
+		}
+		return m, tea.Batch(fetchCommitsCmd(m.repoRoot), refreshTickCmd(m.refreshInterval))
 
 	case statusMsg:
 		m.status = msg.text
@@ -269,7 +295,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleViewerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if isViewerExitKey(m.viewer, msg) {
 		m.viewer = nil
-		return m, nil
+		return m, fetchCommitsCmd(m.repoRoot)
 	}
 	m.viewer.handleKey(msg)
 	return m, nil

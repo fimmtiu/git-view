@@ -41,10 +41,38 @@ func (s *selector) setSize(width, listHeight int) {
 	s.clampScroll()
 }
 
+// setRows keeps the selection on the same commits when they are still in the
+// list, since a refresh can add commits above them.
 func (s *selector) setRows(rows []commitRow) {
+	cursorHash, anchorHash := s.rowHash(s.cursor), s.rowHash(s.anchor)
 	s.rows = rows
-	s.clampSelected()
+	cursor, anchor := s.indexOfHash(cursorHash), s.indexOfHash(anchorHash)
+	if cursor >= 0 && anchor >= 0 {
+		s.cursor, s.anchor = cursor, anchor
+	} else {
+		s.clampSelected()
+	}
 	s.clampScroll()
+}
+
+// rowHash returns "" for a separator or an index out of range.
+func (s selector) rowHash(i int) string {
+	if i < 0 || i >= len(s.rows) || s.rows[i].separator {
+		return ""
+	}
+	return s.rows[i].commit.Hash
+}
+
+func (s selector) indexOfHash(hash string) int {
+	if hash == "" {
+		return -1
+	}
+	for i, row := range s.rows {
+		if !row.separator && row.commit.Hash == hash {
+			return i
+		}
+	}
+	return -1
 }
 
 // ── Dimensions ───────────────────────────────────────────────────────────────

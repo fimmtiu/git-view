@@ -214,6 +214,18 @@ func TestSelector_ClampSelectedAfterAShorterRefresh(t *testing.T) {
 	}
 }
 
+func TestSelector_SetRowsKeepsTheSelectionByHash(t *testing.T) {
+	s := newSelector(5, 80, 10)
+	s.move(1, 1)
+	s.extendRange(2, 1)
+	cursorHash, anchorHash := s.rows[s.cursor].commit.Hash, s.rows[s.anchor].commit.Hash
+
+	s.setRows(buildCommitRows(sampleCommits(5), -1, true))
+	if s.rows[s.cursor].commit.Hash != cursorHash || s.rows[s.anchor].commit.Hash != anchorHash {
+		t.Errorf("cursor=%d anchor=%d no longer point at the same commits", s.cursor, s.anchor)
+	}
+}
+
 func TestSelector_ClampSelectedMovesOffASeparator(t *testing.T) {
 	s := &selector{}
 	s.setSize(80, 10)
