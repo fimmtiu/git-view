@@ -1,0 +1,18 @@
+Generate a detailed Markdown summary of the code changes on this branch with the following sections:
+
+- Purpose
+- How it works
+- Code changes
+  - For each changed file that isn't a test, include:
+    - File name, hyperlinked to GitHub if the GitHub branch is up to date
+    - Change size (e.g., `(+5,–6)`)
+    - A description of what the change does
+- Test changes
+  - For each changed test file, include:
+    - File name, hyperlinked to GitHub if the GitHub branch is up to date
+    - Change size (e.g., `(+5,–6)`)
+    - A description of what the change does
+
+This is meant to be a high-level summary to save time for reviewers, so be brief.
+
+Write the output to `.gv-review/summary.md`. If the file already exists, replace it — the pre-existing contents are no longer useful.

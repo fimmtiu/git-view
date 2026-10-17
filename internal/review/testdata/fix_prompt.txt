@@ -1,0 +1,3 @@
+Read `.gv-review/code-review-findings.md` and fix all of the issues described therein. Commit each fix separately, but group together closely related fixes where possible to minimize the number of commits. You are permitted to push back and ignore an issue if you can provide a well-supported justification for why it's incorrect.
+
+When all issues are fixed, append a new section to the bottom of that file which explains for each issue what you fixed, or why you pushed back.

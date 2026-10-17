@@ -1,0 +1,58 @@
+Do an adversarial code review of the current branch. This is a read-only review; do NOT push to GitHub or modify existing commits.
+Base commit: aaa111
+HEAD commit: bbb222
+
+Setup:
+- Use the GitHub MCP tools (`mcp__github__*`, load via ToolSearch if needed) to check for PR metadata: title, body, head SHA, base, CI status, and comments. The branch may not have been pushed or have an open PR yet; these are useful optional context, not required fields.
+- Read any relevant `.claude/skills/*/SKILL.md` files for context.
+- Read all of the code changes between the branch's base commit and the HEAD commit.
+
+Spawn a pool of six Sonnet sub-agents to examine each of the following aspects of the code changes in parallel:
+
+### Design
+- Is this the best approach to accomplish what the code is trying to do?
+- Is this code sustainable? Is it a design that can easily grow over time, or will it lock us into a potentially problematic pattern as we scale and the code evolves?
+- Suggest better solutions if any exist.
+
+### Abstraction
+- Is this the right place for this change to live?
+- Does this code own the data that it's modifying?
+- If we're passing parameters, would it make more sense for them to be member data of the object that's being operated on instead?
+- Does this change increase the number of files we'll have to touch the next time this functionality has to change?
+- Is there a deeper structural change we could make that would make this change simpler?
+
+### Code quality
+- Unclear code, where the intent isn't obvious from the code itself and no comments explain it
+- Useless comments that just explain what the code is doing without explaining why
+- Misspellings in variable names or comments
+- Ignoring established patterns that already exist in the codebase
+- Places where necessary error handling is missing, or errors are being unnecessarily suppressed
+- Stale comments, docstrings, or skills that no longer accurately describe the code
+
+### Performance
+- Inefficient procedures (O(n^2) algorithms, duplicated work, etc.)
+- Database queries that are likely to be problematic
+- Excessive queries to databases or APIs which could be batched into fewer queries
+- Memory leaks, or large memory allocations that don't get freed by garbage collection
+- Inefficient, money-wasting use of LLM tokens or cloud resources
+- Anything else that could be unexpectedly slow or resource-intensive
+
+### Security
+- Do the changes potentially introduce any security holes that an attacker could use to leak data, impersonate users, escalate privileges, run untrusted commands, or cause any other unwanted security violation?
+- You MUST include an explanation of why it worries you and a description of how an attacker could make use of it. Only report an issue if you can describe a concrete, realistic attack: what specific input or action the attacker takes, what system boundary they cross, and what they gain. Speculative chains of events ("could potentially lead to...") do not qualify.
+- Code quality concerns, error handling gaps, and reliability issues are NOT security findings unless they directly enable a violation with no additional assumptions.
+- For each candidate finding, argue against it: what would have to be true for this to actually be exploitable? If the preconditions are implausible or outside an attacker's control, discard it.
+
+### Testing
+- Are any important pieces of logic untested?
+- Would any tests fail if the code were reverted?
+- Are any of the pre-existing tests no longer relevant?
+- Are any of the tests brittle, or don't provide enough protection to be worthwhile?
+
+Instructions for each sub-agent: "Hunt adversarially. Try to break the code. VERIFY every candidate issue before including it. Cite file:line at the PR head, quote the code or prompt text, and drop anything you can't substantiate. Classify each finding as Blocker, Should Fix, or Nit based on severity. Each one gets a title, a file:line link (https://github.com/<owner>/<repo>/blob/bbb222/path#Lnn), evidence, a concrete failing example where relevant, and a suggested fix."
+
+Deliverable: write `.gv-review/code-review-findings.md` containing:
+- Title, PR link (if any), head SHA, base SHA, today's date in `YYYY-MM-DD` format, and a one-line scope.
+- A one-line verdict, plus counts of Blockers / Should Fix / Nits.
+- Findings grouped by severity as Blockers, Should Fix, and Nits.
+Keep it tight. Do not put any model names in the file. If the file already exists, replace it — the pre-existing contents are no longer useful.
