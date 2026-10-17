@@ -1,8 +1,22 @@
 package editor
 
 import (
+	"os/exec"
 	"testing"
 )
+
+func assertCmdArgs(t *testing.T, cmd *exec.Cmd, want []string) {
+	t.Helper()
+	args := cmd.Args[1:]
+	if len(args) != len(want) {
+		t.Fatalf("args = %v, want %v", args, want)
+	}
+	for i, arg := range args {
+		if arg != want[i] {
+			t.Errorf("args[%d] = %q, want %q", i, arg, want[i])
+		}
+	}
+}
 
 func TestCommandFiles_VSCodeWithGoto(t *testing.T) {
 	e := Editor{Argv: []string{"code", "--goto"}, GUI: true}
@@ -12,17 +26,7 @@ func TestCommandFiles_VSCodeWithGoto(t *testing.T) {
 		t.Errorf("cmd.Dir = %q, want /tmp/repo", cmd.Dir)
 	}
 
-	// Arguments should be the files without --goto
-	want := []string{"a.md", "b.md"}
-	args := cmd.Args[1:] // Skip the command itself
-	if len(args) != len(want) {
-		t.Fatalf("args = %v, want %v", args, want)
-	}
-	for i, arg := range args {
-		if arg != want[i] {
-			t.Errorf("args[%d] = %q, want %q", i, arg, want[i])
-		}
-	}
+	assertCmdArgs(t, cmd, []string{"a.md", "b.md"})
 
 	// Original Argv should be unchanged
 	if len(e.Argv) != 2 || e.Argv[0] != "code" || e.Argv[1] != "--goto" {
@@ -38,17 +42,7 @@ func TestCommandFiles_VimNoGoto(t *testing.T) {
 		t.Errorf("cmd.Dir = %q, want /tmp/repo", cmd.Dir)
 	}
 
-	// Arguments should be just the files
-	want := []string{"a.md", "b.md"}
-	args := cmd.Args[1:]
-	if len(args) != len(want) {
-		t.Fatalf("args = %v, want %v", args, want)
-	}
-	for i, arg := range args {
-		if arg != want[i] {
-			t.Errorf("args[%d] = %q, want %q", i, arg, want[i])
-		}
-	}
+	assertCmdArgs(t, cmd, []string{"a.md", "b.md"})
 }
 
 func TestCommandFiles_UserSpecWithFlag(t *testing.T) {
@@ -59,17 +53,7 @@ func TestCommandFiles_UserSpecWithFlag(t *testing.T) {
 		t.Errorf("cmd.Dir = %q, want /tmp/repo", cmd.Dir)
 	}
 
-	// Arguments should preserve the -p flag
-	want := []string{"-p", "a.md", "b.md"}
-	args := cmd.Args[1:]
-	if len(args) != len(want) {
-		t.Fatalf("args = %v, want %v", args, want)
-	}
-	for i, arg := range args {
-		if arg != want[i] {
-			t.Errorf("args[%d] = %q, want %q", i, arg, want[i])
-		}
-	}
+	assertCmdArgs(t, cmd, []string{"-p", "a.md", "b.md"})
 }
 
 func TestCommandFiles_PreservesArgv(t *testing.T) {

@@ -35,6 +35,8 @@ type reviewState struct {
 	claudeFound      bool // checked once, at startup
 	hasBranchChanges bool
 	findingsExist    bool
+	startJob         review.StartFunc
+	now              func() time.Time
 	task             *aiTask     // the running review or fix, or nil
 	notice           *dialogView // a message dialog with an OK button, or nil
 	nextTaskID       int
