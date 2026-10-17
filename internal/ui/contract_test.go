@@ -2,12 +2,12 @@ package ui
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fimmtiu/git-view/internal/editor"
 	"github.com/fimmtiu/git-view/internal/git"
 	"github.com/fimmtiu/git-view/internal/review"
 )
-
 // Check that every function and method in the contract exists.
 var (
 	_ = git.BranchBase
@@ -77,7 +77,7 @@ func TestContract_Constants(t *testing.T) {
 		{"review.SummaryJobName", review.SummaryJobName, "PR summary"},
 		{"review.FixJobName", review.FixJobName, "Fixes"},
 		{"review.ClaudeBinary", review.ClaudeBinary, "claude"},
-		{"review.CancelGracePeriod", int64(review.CancelGracePeriod), int64(5000000000)},
+		{"review.CancelGracePeriod", review.CancelGracePeriod.Nanoseconds(), (5 * time.Second).Nanoseconds()},
 		{"reviewDialogTitle", reviewDialogTitle, "Code review"},
 		{"fixDialogTitle", fixDialogTitle, "Fixing issues"},
 		{"dirtyTreeMessage", dirtyTreeMessage, "Commit all uncommitted changes before you start a code review."},
@@ -93,7 +93,7 @@ func TestContract_Constants(t *testing.T) {
 		{"reviewHintDesc", reviewHintDesc, "code review"},
 		{"fixHintKey", fixHintKey, "F"},
 		{"fixHintDesc", fixHintDesc, "fix issues"},
-		{"dialogTickInterval", int64(dialogTickInterval), int64(1000000000)},
+		{"dialogTickInterval", dialogTickInterval.Nanoseconds(), time.Second.Nanoseconds()},
 	}
 
 	for _, tt := range tests {

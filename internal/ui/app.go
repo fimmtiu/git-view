@@ -483,7 +483,7 @@ func (m Model) View() string {
 	} else {
 		bar = m.renderSelectorStatusBar(innerW)
 		panes = m.selector.renderPanes()
-		hints = m.selector.hintPairs()
+		hints = m.selector.hintPairs(m.reviewKeys())
 	}
 
 	statusBar := theme.StatusBarStyle.Width(innerW).Render(bar)
