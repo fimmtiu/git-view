@@ -36,6 +36,8 @@ type commitListMsg struct {
 	commits        []git.CommitEntry
 	forkPointIdx   int
 	hasUncommitted bool
+	branchChanges  bool
+	findingsExist  bool
 	err            string
 }
 
@@ -110,6 +112,7 @@ func NewModel(repoRoot, repoLabel string) Model {
 		refreshInterval: defaultRefreshInterval,
 		editor:          ed,
 		editorFound:     found,
+		review:          newReviewState(),
 		startJob:        review.Start,
 		timeNow:         time.Now,
 	}
@@ -128,10 +131,14 @@ func fetchCommitsCmd(repoRoot string) tea.Cmd {
 			return commitListMsg{forkPointIdx: -1, err: err.Error()}
 		}
 		hasUncommitted, _ := git.HasUncommittedChanges(repoRoot)
+		branchChanges, _ := git.HasBranchChanges(repoRoot)
+		findingsExist := review.FindingsExist(repoRoot)
 		return commitListMsg{
 			commits:        commits,
 			forkPointIdx:   git.ForkPointIndex(repoRoot, commits),
 			hasUncommitted: hasUncommitted,
+			branchChanges:  branchChanges,
+			findingsExist:  findingsExist,
 		}
 	}
 }
@@ -232,6 +239,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, afterChild(nil)
 		}
 		m.errorMsg = ""
+		m.review.hasBranchChanges = msg.branchChanges
+		m.review.findingsExist = msg.findingsExist
 		m.selector.setRows(buildCommitRows(msg.commits, msg.forkPointIdx, msg.hasUncommitted))
 		// A commit's stat never changes, but the working tree's can.
 		if m.selector.statHash == git.UncommittedHash {
