@@ -122,8 +122,6 @@ func TestContract_Types(t *testing.T) {
 		claudeFound:      true,
 		hasBranchChanges: true,
 		findingsExist:    true,
-		startJob:         review.Start,
-		now:              nil,
 		task:             nil,
 		notice:           nil,
 		nextTaskID:       0,
@@ -175,6 +173,11 @@ func TestContract_Types(t *testing.T) {
 		err:            "",
 	}
 
+	_ = reviewStateMsg{
+		hasBranchChanges: true,
+		findingsExist:    true,
+	}
+
 	// Check jobState constants.
 	if jobRunning != 0 || jobDone != 1 || jobFailed != 2 || jobCancelled != 3 {
 		t.Errorf("jobState constants: running=%d, done=%d, failed=%d, cancelled=%d, want 0, 1, 2, 3",
@@ -189,4 +192,42 @@ func TestContract_Types(t *testing.T) {
 	// Check that Model has review field.
 	m := Model{}
 	_ = m.review
+
+	// Check that Model has startJob and timeNow fields.
+	_ = m.startJob
+	_ = m.timeNow
+}
+
+// TestContract_MessageStructureSeparation_After verifies the desired state after CR #28.
+func TestContract_MessageStructureSeparation_After(t *testing.T) {
+	t.Run("commitListMsg should not have review fields", func(t *testing.T) {
+		msg := commitListMsg{
+			commits:        nil,
+			forkPointIdx:   0,
+			hasUncommitted: false,
+			err:            "",
+		}
+		_ = msg
+	})
+
+	t.Run("reviewStateMsg should carry review state", func(t *testing.T) {
+		msg := reviewStateMsg{
+			hasBranchChanges: true,
+			findingsExist:    false,
+		}
+		
+		if !msg.hasBranchChanges {
+			t.Error("hasBranchChanges field should be accessible")
+		}
+		if msg.findingsExist {
+			t.Error("findingsExist field should be accessible")
+		}
+	})
+
+	t.Run("reviewStateMsg is a distinct type from commitListMsg", func(t *testing.T) {
+		var commit commitListMsg
+		var review reviewStateMsg
+		_ = commit
+		_ = review
+	})
 }

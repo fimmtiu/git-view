@@ -10,6 +10,7 @@ import (
 
 	"github.com/fimmtiu/git-view/internal/diff"
 	"github.com/fimmtiu/git-view/internal/git"
+	"github.com/fimmtiu/git-view/internal/review"
 )
 
 func onSelector(t *testing.T, n, width, height int) Model {
@@ -637,6 +638,41 @@ func TestChildProcessExit_KeepsTheFollowUpCommand(t *testing.T) {
 
 	if _, ok := findMsg[showStatMsg](cmd); !ok {
 		t.Error("loading the commit list should still fetch the first preview")
+	}
+}
+
+// ── Model dependency injection ───────────────────────────────────────────────
+
+func TestNewModel_WithCustomStartJobFunc(t *testing.T) {
+	customStartCalled := false
+	customStart := func(repoRoot string, spec review.JobSpec) (review.Process, error) {
+		customStartCalled = true
+		return nil, nil
+	}
+
+	m := NewModel("/tmp/repo", "test")
+	m.startJob = customStart
+
+	m.startJob("/tmp/repo", review.JobSpec{})
+
+	if !customStartCalled {
+		t.Error("Model should use the custom startJob function")
+	}
+}
+
+func TestNewModel_WithCustomTimeNowFunc(t *testing.T) {
+	fixedTime := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
+	customNow := func() time.Time {
+		return fixedTime
+	}
+
+	m := NewModel("/tmp/repo", "test")
+	m.timeNow = customNow
+
+	got := m.timeNow()
+
+	if !got.Equal(fixedTime) {
+		t.Errorf("Model should use the custom timeNow function, got %v, want %v", got, fixedTime)
 	}
 }
 

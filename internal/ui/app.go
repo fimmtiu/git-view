@@ -13,6 +13,7 @@ import (
 	"github.com/fimmtiu/git-view/internal/diff"
 	"github.com/fimmtiu/git-view/internal/editor"
 	"github.com/fimmtiu/git-view/internal/git"
+	"github.com/fimmtiu/git-view/internal/review"
 )
 
 // Rows of chrome outside the content panes. Each status bar count includes its
@@ -84,6 +85,9 @@ type Model struct {
 	// Recorded so the E key can explain itself rather than do nothing.
 	editorFound bool
 
+	startJob review.StartFunc
+	timeNow  func() time.Time
+
 	review reviewState
 
 	// Sticky failure from loading commits or a diff.
@@ -106,11 +110,13 @@ func NewModel(repoRoot, repoLabel string) Model {
 		refreshInterval: defaultRefreshInterval,
 		editor:          ed,
 		editorFound:     found,
+		startJob:        review.Start,
+		timeNow:         time.Now,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(fetchCommitsCmd(m.repoRoot), refreshTickCmd(m.refreshInterval))
+	return tea.Batch(fetchCommitsCmd(m.repoRoot), fetchReviewStateCmd(), refreshTickCmd(m.refreshInterval))
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -132,6 +138,12 @@ func fetchCommitsCmd(repoRoot string) tea.Cmd {
 
 func refreshTickCmd(interval time.Duration) tea.Cmd {
 	return tea.Tick(interval, func(time.Time) tea.Msg { return refreshTickMsg{} })
+}
+
+func fetchReviewStateCmd() tea.Cmd {
+	return func() tea.Msg {
+		return reviewStateMsg{hasBranchChanges: false, findingsExist: false}
+	}
 }
 
 func fetchStatCmd(repoRoot, hash string) tea.Cmd {
@@ -243,6 +255,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case childExitedMsg:
 		return m, afterChild(nil)
+
+	case reviewStateMsg:
+		m.review.hasBranchChanges = msg.hasBranchChanges
+		m.review.findingsExist = msg.findingsExist
+		return m, nil
 
 	// The viewer does not show the commit list, and closing it reloads the list
 	// anyway, so the tick skips the fetch while the viewer is open.

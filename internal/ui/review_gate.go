@@ -1,10 +1,18 @@
 package ui
 
 // newReviewState checks for claude once, at startup.
-func newReviewState() reviewState { panic("scaffold stub") }
+func newReviewState() reviewState {
+	return reviewState{
+		task:       nil,
+		notice:     nil,
+		nextTaskID: 0,
+	}
+}
 
 // reviewKeys reports which of the C and F keys are available.
 func (m Model) reviewKeys() reviewKeys {
-	// Scaffold stub: return empty keys until review functionality is implemented.
-	return reviewKeys{}
+	return reviewKeys{
+		review: m.review.claudeFound && m.review.hasBranchChanges,
+		fix:    m.review.claudeFound && m.review.findingsExist,
+	}
 }
