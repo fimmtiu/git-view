@@ -405,6 +405,27 @@ func (m Model) openViewer() (tea.Model, tea.Cmd) {
 	return m, fetchDiffCmd(m.repoRoot, start, end)
 }
 
+// execEditor launches cmd using the appropriate method for the editor type.
+// For GUI editors, it starts the process in the background and returns a
+// command that waits for it. For terminal editors, it uses tea.ExecProcess
+// to suspend and restore the TUI.
+func (m Model) execEditor(cmd *exec.Cmd) tea.Cmd {
+	if m.editor.GUI {
+		if err := cmd.Start(); err != nil {
+			return statusCmd(fmt.Sprintf("editor failed: %s", err), true)
+		}
+		return waitForChildCmd(cmd)
+	}
+
+	// Terminal editor: use tea.ExecProcess to suspend and restore the TUI
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return statusMsg{text: fmt.Sprintf("editor failed: %s", err), isErr: true}
+		}
+		return statusMsg{}
+	})
+}
+
 // openEditor targets the selected line, or the repository itself on the selector
 // screen where no file is in view. Terminal editors need the tty, so they run
 // through tea.ExecProcess, which suspends and restores the TUI around them.
@@ -423,18 +444,7 @@ func (m Model) openEditor() (tea.Model, tea.Cmd) {
 	}
 
 	cmd := m.editor.Command(m.repoRoot, target, line)
-	if m.editor.GUI {
-		if err := cmd.Start(); err != nil {
-			return m, statusCmd(fmt.Sprintf("editor failed: %s", err), true)
-		}
-		return m, waitForChildCmd(cmd)
-	}
-	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			return statusMsg{text: fmt.Sprintf("editor failed: %s", err), isErr: true}
-		}
-		return statusMsg{}
-	})
+	return m, m.execEditor(cmd)
 }
 
 func (m Model) openGitHub() (tea.Model, tea.Cmd) {

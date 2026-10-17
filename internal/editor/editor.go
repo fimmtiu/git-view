@@ -117,6 +117,17 @@ func baseName(cmd string) string {
 	return cmd
 }
 
+// ArgsWithoutLinePositioning returns Argv minus the command and line-positioning flags.
+func (e Editor) ArgsWithoutLinePositioning() []string {
+	args := make([]string, 0, len(e.Argv)-1)
+	for _, arg := range e.Argv[1:] {
+		if arg != "--goto" {
+			args = append(args, arg)
+		}
+	}
+	return args
+}
+
 // Command opens file at line, or at the top when line is not positive. dir is
 // the working directory that relative diff paths resolve against.
 func (e Editor) Command(dir, file string, line int) *exec.Cmd {
