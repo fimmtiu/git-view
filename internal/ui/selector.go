@@ -396,7 +396,7 @@ func wrapLine(line string, width int) []string {
 }
 
 // Ordered most to least important, since buildHintFit elides from the end.
-func (s selector) hintPairs(keys reviewKeys) []string {
+func (s selector) hintPairs() []string {
 	return []string{
 		"↑↓", "navigate", "Tab/Enter", "view diff", "Shift+↑↓", "extend range",
 		"PgUp/Dn", "page", "E", "edit repo", "Q", "quit",

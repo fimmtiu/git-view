@@ -36,8 +36,6 @@ type commitListMsg struct {
 	forkPointIdx   int
 	hasUncommitted bool
 	err            string
-	branchChanges  bool
-	findingsExist  bool
 }
 
 type showStatMsg struct {
@@ -475,7 +473,7 @@ func (m Model) View() string {
 	} else {
 		bar = m.renderSelectorStatusBar(innerW)
 		panes = m.selector.renderPanes()
-		hints = m.selector.hintPairs(reviewKeys{})
+		hints = m.selector.hintPairs()
 	}
 
 	statusBar := theme.StatusBarStyle.Width(innerW).Render(bar)

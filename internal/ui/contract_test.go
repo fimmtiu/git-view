@@ -173,8 +173,6 @@ func TestContract_Types(t *testing.T) {
 		forkPointIdx:   0,
 		hasUncommitted: false,
 		err:            "",
-		branchChanges:  true,
-		findingsExist:  true,
 	}
 
 	// Check jobState constants.
