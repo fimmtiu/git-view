@@ -148,12 +148,18 @@ func (m *Model) cancelTask() {
 	}
 }
 
+// isDialogCloseKey returns true if the key closes dialogs.
+func isDialogCloseKey(key string) bool {
+	return key == "enter" || key == "esc"
+}
+
 // handleDialogKey takes every key while a dialog is open.
 func (m Model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+
 	// Notice dialog: enter, esc, or space closes it
 	if m.review.notice != nil {
-		switch msg.String() {
-		case "enter", "esc", " ":
+		if isDialogCloseKey(key) || key == " " {
 			m.review.notice = nil
 		}
 		return m, nil
@@ -161,8 +167,7 @@ func (m Model) handleDialogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Task dialog: enter or esc cancels
 	if m.review.task != nil {
-		switch msg.String() {
-		case "enter", "esc":
+		if isDialogCloseKey(key) {
 			m.cancelTask()
 		}
 		return m, nil

@@ -14,12 +14,17 @@ const (
 	FindingsFile = "code-review-findings.md"
 )
 
+// outputPath returns the absolute path for a named output file.
+func outputPath(repoRoot, filename string) string {
+	return filepath.Join(repoRoot, Dir, filename)
+}
+
 func SummaryPath(repoRoot string) string {
-	return filepath.Join(repoRoot, Dir, SummaryFile)
+	return outputPath(repoRoot, SummaryFile)
 }
 
 func FindingsPath(repoRoot string) string {
-	return filepath.Join(repoRoot, Dir, FindingsFile)
+	return outputPath(repoRoot, FindingsFile)
 }
 
 // isRegularFile checks if the path exists and is a regular file.
@@ -46,12 +51,10 @@ func Prepare(repoRoot string) error {
 		return err
 	}
 	
-	if err := removeIfExists(SummaryPath(repoRoot)); err != nil {
-		return err
-	}
-	
-	if err := removeIfExists(FindingsPath(repoRoot)); err != nil {
-		return err
+	for _, filename := range []string{SummaryFile, FindingsFile} {
+		if err := removeIfExists(outputPath(repoRoot, filename)); err != nil {
+			return err
+		}
 	}
 	
 	return nil
@@ -65,12 +68,10 @@ func FindingsExist(repoRoot string) bool {
 func MissingOutputs(repoRoot string) []string {
 	var missing []string
 	
-	if !isRegularFile(SummaryPath(repoRoot)) {
-		missing = append(missing, filepath.Join(Dir, SummaryFile))
-	}
-	
-	if !isRegularFile(FindingsPath(repoRoot)) {
-		missing = append(missing, filepath.Join(Dir, FindingsFile))
+	for _, filename := range []string{SummaryFile, FindingsFile} {
+		if !isRegularFile(outputPath(repoRoot, filename)) {
+			missing = append(missing, filepath.Join(Dir, filename))
+		}
 	}
 	
 	if len(missing) == 0 {
