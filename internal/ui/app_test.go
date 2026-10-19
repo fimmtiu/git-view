@@ -651,9 +651,9 @@ func TestNewModel_WithCustomStartJobFunc(t *testing.T) {
 	}
 
 	m := NewModel("/tmp/repo", "test")
-	m.startJob = customStart
+	m.review.startJob = customStart
 
-	m.startJob("/tmp/repo", review.JobSpec{})
+	m.review.startJob("/tmp/repo", review.JobSpec{})
 
 	if !customStartCalled {
 		t.Error("Model should use the custom startJob function")
@@ -667,9 +667,9 @@ func TestNewModel_WithCustomTimeNowFunc(t *testing.T) {
 	}
 
 	m := NewModel("/tmp/repo", "test")
-	m.timeNow = customNow
+	m.review.now = customNow
 
-	got := m.timeNow()
+	got := m.review.now()
 
 	if !got.Equal(fixedTime) {
 		t.Errorf("Model should use the custom timeNow function, got %v, want %v", got, fixedTime)

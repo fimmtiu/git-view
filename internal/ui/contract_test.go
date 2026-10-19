@@ -193,9 +193,9 @@ func TestContract_Types(t *testing.T) {
 	m := Model{}
 	_ = m.review
 
-	// Check that Model has startJob and timeNow fields.
-	_ = m.startJob
-	_ = m.timeNow
+	// Check that reviewState has startJob and now fields.
+	_ = m.review.startJob
+	_ = m.review.now
 }
 
 // TestContract_MessageStructureSeparation_After verifies the desired state after CR #28.

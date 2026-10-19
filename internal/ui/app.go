@@ -87,9 +87,6 @@ type Model struct {
 	// Recorded so the E key can explain itself rather than do nothing.
 	editorFound bool
 
-	startJob review.StartFunc
-	timeNow  func() time.Time
-
 	review reviewState
 
 	// Sticky failure from loading commits or a diff.
@@ -113,13 +110,11 @@ func NewModel(repoRoot, repoLabel string) Model {
 		editor:          ed,
 		editorFound:     found,
 		review:          newReviewState(),
-		startJob:        review.Start,
-		timeNow:         time.Now,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(fetchCommitsCmd(m.repoRoot), fetchReviewStateCmd(), refreshTickCmd(m.refreshInterval))
+	return tea.Batch(fetchCommitsCmd(m.repoRoot), refreshTickCmd(m.refreshInterval))
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -145,12 +140,6 @@ func fetchCommitsCmd(repoRoot string) tea.Cmd {
 
 func refreshTickCmd(interval time.Duration) tea.Cmd {
 	return tea.Tick(interval, func(time.Time) tea.Msg { return refreshTickMsg{} })
-}
-
-func fetchReviewStateCmd() tea.Cmd {
-	return func() tea.Msg {
-		return reviewStateMsg{hasBranchChanges: false, findingsExist: false}
-	}
 }
 
 func fetchStatCmd(repoRoot, hash string) tea.Cmd {
