@@ -117,6 +117,14 @@ func baseName(cmd string) string {
 	return cmd
 }
 
+// newCommand creates an exec.Cmd with the editor program and arguments,
+// setting the working directory for relative path resolution.
+func (e Editor) newCommand(dir string, args []string) *exec.Cmd {
+	cmd := exec.Command(e.Argv[0], args...)
+	cmd.Dir = dir
+	return cmd
+}
+
 // Command opens file at line, or at the top when line is not positive. dir is
 // the working directory that relative diff paths resolve against.
 func (e Editor) Command(dir, file string, line int) *exec.Cmd {
@@ -127,7 +135,5 @@ func (e Editor) Command(dir, file string, line int) *exec.Cmd {
 	default:
 		args = append(args, file)
 	}
-	cmd := exec.Command(e.Argv[0], args...)
-	cmd.Dir = dir
-	return cmd
+	return e.newCommand(dir, args)
 }
