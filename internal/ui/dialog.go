@@ -9,12 +9,23 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// renderDialog draws v as a bordered box no wider than maxWidth: the title, the
-// lines, the elapsed time when showElapsed is set, and the button.
-func renderDialog(v dialogView, maxWidth int) string {
+func (v dialogView) Render(maxWidth int) string {
+	innerWidth := v.calculateDialogWidth(maxWidth)
+	
+	var content strings.Builder
+	content.WriteString(v.formatTitle(innerWidth))
+	content.WriteString(v.formatContentLines(innerWidth))
+	content.WriteString(v.formatElapsedSection(innerWidth))
+	content.WriteString(v.formatButtonSection(innerWidth))
+	
+	return theme.DialogStyle.Width(innerWidth).Render(content.String())
+}
+
+// calculateDialogWidth computes the inner content width after accounting for
+// borders and padding. It applies minimum width constraints.
+func (v dialogView) calculateDialogWidth(maxWidth int) int {
 	const minInnerWidth = 30
 	
-	// Calculate border and padding from the actual style
 	_, right, _, left := theme.DialogStyle.GetPadding()
 	horizontalPadding := left + right
 	borderWidth := 2 // Left border character + right border character
@@ -27,40 +38,59 @@ func renderDialog(v dialogView, maxWidth int) string {
 		innerWidth = minInnerWidth
 	}
 	
+	return innerWidth
+}
+
+// formatTitle returns the rendered title section with trailing newlines.
+func (v dialogView) formatTitle(innerWidth int) string {
+	titleText := ansi.Truncate(v.title, innerWidth, "…")
+	return theme.DialogTitleStyle.Render(titleText) + "\n\n"
+}
+
+// formatContentLines returns the formatted content lines with newlines.
+func (v dialogView) formatContentLines(innerWidth int) string {
 	var content strings.Builder
 	
-	// Title
-	titleText := ansi.Truncate(v.title, innerWidth, "…")
-	content.WriteString(theme.DialogTitleStyle.Render(titleText))
-	content.WriteString("\n\n")
-	
-	// Lines
 	for _, line := range v.lines {
 		truncated := ansi.Truncate(line, innerWidth, "…")
 		content.WriteString(truncated)
 		content.WriteString("\n")
 	}
 	
-	// Elapsed time
-	if v.showElapsed {
-		content.WriteString("\n")
-		elapsed := "Elapsed: " + formatElapsed(v.elapsed)
-		content.WriteString(ansi.Truncate(elapsed, innerWidth, "…"))
-		content.WriteString("\n")
+	return content.String()
+}
+
+// formatElapsedSection returns the elapsed time section if showElapsed is true,
+// otherwise returns an empty string.
+func (v dialogView) formatElapsedSection(innerWidth int) string {
+	if !v.showElapsed {
+		return ""
 	}
 	
-	// Button (centered)
-	content.WriteString("\n")
+	var section strings.Builder
+	section.WriteString("\n")
+	elapsed := "Elapsed: " + formatElapsed(v.elapsed)
+	section.WriteString(ansi.Truncate(elapsed, innerWidth, "…"))
+	section.WriteString("\n")
+	
+	return section.String()
+}
+
+// formatButtonSection returns the button centered within the available width.
+func (v dialogView) formatButtonSection(innerWidth int) string {
+	var section strings.Builder
+	section.WriteString("\n")
+	
 	button := theme.DialogButtonStyle.Render(v.button)
 	buttonWidth := lipgloss.Width(button)
 	padding := (innerWidth - buttonWidth) / 2
-	if padding > 0 {
-		content.WriteString(strings.Repeat(" ", padding))
-	}
-	content.WriteString(button)
 	
-	// Apply dialog style with border
-	return theme.DialogStyle.Width(innerWidth).Render(content.String())
+	if padding > 0 {
+		section.WriteString(strings.Repeat(" ", padding))
+	}
+	section.WriteString(button)
+	
+	return section.String()
 }
 
 // formatElapsed renders d as MM:SS, rounded down to whole seconds. Minutes are not capped at 59.

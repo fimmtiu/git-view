@@ -45,9 +45,9 @@ func TestFormatElapsed_Negative(t *testing.T) {
 	}
 }
 
-// ── renderDialog ─────────────────────────────────────────────────────────────
+// ── Render (dialogView.Render) ───────────────────────────────────────────────
 
-func TestRenderDialog_ContainsAllElements(t *testing.T) {
+func TestRender_ContainsAllElements(t *testing.T) {
 	v := dialogView{
 		title:       "Test Dialog",
 		lines:       []string{"Line one", "Line two"},
@@ -56,27 +56,27 @@ func TestRenderDialog_ContainsAllElements(t *testing.T) {
 		button:      "OK",
 	}
 	
-	got := renderDialog(v, 80)
+	got := v.Render(80)
 	plain := stripAnsi(got)
 	
 	if !strings.Contains(plain, "Test Dialog") {
-		t.Errorf("renderDialog output missing title: %q", plain)
+		t.Errorf("Render output missing title: %q", plain)
 	}
 	if !strings.Contains(plain, "Line one") {
-		t.Errorf("renderDialog output missing first line: %q", plain)
+		t.Errorf("Render output missing first line: %q", plain)
 	}
 	if !strings.Contains(plain, "Line two") {
-		t.Errorf("renderDialog output missing second line: %q", plain)
+		t.Errorf("Render output missing second line: %q", plain)
 	}
 	if !strings.Contains(plain, "Elapsed: 01:05") {
-		t.Errorf("renderDialog output missing elapsed time: %q", plain)
+		t.Errorf("Render output missing elapsed time: %q", plain)
 	}
 	if !strings.Contains(plain, "OK") {
-		t.Errorf("renderDialog output missing button: %q", plain)
+		t.Errorf("Render output missing button: %q", plain)
 	}
 }
 
-func TestRenderDialog_NoElapsedWhenShowElapsedFalse(t *testing.T) {
+func TestRender_NoElapsedWhenShowElapsedFalse(t *testing.T) {
 	v := dialogView{
 		title:       "Test",
 		lines:       []string{"Content"},
@@ -85,15 +85,15 @@ func TestRenderDialog_NoElapsedWhenShowElapsedFalse(t *testing.T) {
 		button:      "Cancel",
 	}
 	
-	got := renderDialog(v, 80)
+	got := v.Render(80)
 	plain := stripAnsi(got)
 	
 	if strings.Contains(plain, "Elapsed") {
-		t.Errorf("renderDialog should not show elapsed when showElapsed is false: %q", plain)
+		t.Errorf("Render should not show elapsed when showElapsed is false: %q", plain)
 	}
 }
 
-func TestRenderDialog_RespectsMaxWidth(t *testing.T) {
+func TestRender_RespectsMaxWidth(t *testing.T) {
 	// Create a very long line
 	longLine := strings.Repeat("x", 200)
 	
@@ -113,7 +113,7 @@ func TestRenderDialog_RespectsMaxWidth(t *testing.T) {
 			button:      "OK",
 		}
 		
-		got := renderDialog(v, tc.maxWidth)
+		got := v.Render(tc.maxWidth)
 		lines := strings.Split(got, "\n")
 		
 		for i, line := range lines {

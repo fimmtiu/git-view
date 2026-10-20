@@ -514,7 +514,7 @@ func (m Model) View() string {
 
 	if m.review.task != nil || m.review.notice != nil {
 		if v, ok := m.dialogView(); ok {
-			full = overlayCenter(full, renderDialog(v, m.width), m.width, m.height)
+			full = overlayCenter(full, v.Render(m.width), m.width, m.height)
 		}
 	}
 	if m.notifText != "" {

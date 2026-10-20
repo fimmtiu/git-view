@@ -14,6 +14,9 @@ const (
 	FindingsFile = "code-review-findings.md"
 )
 
+// outputFiles is the list of output files created by review and fix jobs.
+var outputFiles = []string{SummaryFile, FindingsFile}
+
 // outputPath returns the absolute path for a named output file.
 func outputPath(repoRoot, filename string) string {
 	return filepath.Join(repoRoot, Dir, filename)
@@ -51,7 +54,7 @@ func Prepare(repoRoot string) error {
 		return err
 	}
 	
-	for _, filename := range []string{SummaryFile, FindingsFile} {
+	for _, filename := range outputFiles {
 		if err := removeIfExists(outputPath(repoRoot, filename)); err != nil {
 			return err
 		}
@@ -68,7 +71,7 @@ func FindingsExist(repoRoot string) bool {
 func MissingOutputs(repoRoot string) []string {
 	var missing []string
 	
-	for _, filename := range []string{SummaryFile, FindingsFile} {
+	for _, filename := range outputFiles {
 		if !isRegularFile(outputPath(repoRoot, filename)) {
 			missing = append(missing, filepath.Join(Dir, filename))
 		}

@@ -24,16 +24,13 @@ func (s jobState) String() string {
 	}
 }
 
-// startTask starts every job in specs and opens the task dialog.
 func (m Model) startTask(title string, specs []review.JobSpec, onFinish taskFinishFunc) (tea.Model, tea.Cmd) {
 	var procs []review.Process
 	var jobs []taskJob
 
-	// Try to start all jobs
 	for _, spec := range specs {
 		proc, err := m.review.startJob(m.repoRoot, spec)
 		if err != nil {
-			// Cancel all previously started jobs
 			for _, p := range procs {
 				p.Cancel()
 			}
@@ -47,7 +44,6 @@ func (m Model) startTask(title string, specs []review.JobSpec, onFinish taskFini
 		})
 	}
 
-	// All jobs started successfully
 	taskID := m.review.nextTaskID
 	m.review.nextTaskID++
 	m.review.task = &aiTask{
@@ -58,7 +54,6 @@ func (m Model) startTask(title string, specs []review.JobSpec, onFinish taskFini
 		onFinish: onFinish,
 	}
 
-	// Build command batch: one waitJobCmd per job, plus dialogTickCmd
 	cmds := make([]tea.Cmd, 0, len(jobs)+1)
 	for i, proc := range procs {
 		cmds = append(cmds, waitJobCmd(taskID, i, proc))
@@ -96,15 +91,7 @@ func (m Model) handleJobExited(msg jobExitedMsg) (tea.Model, tea.Cmd) {
 	// Update the job's state
 	job := &t.jobs[msg.index]
 	job.err = msg.err
-
-	// Determine state: cancelled if ErrCancelled or task is cancelling; failed for other errors; done for nil
-	if errors.Is(msg.err, review.ErrCancelled) || t.cancelling {
-		job.state = jobCancelled
-	} else if msg.err != nil {
-		job.state = jobFailed
-	} else {
-		job.state = jobDone
-	}
+	job.state = t.determineJobState(msg.err)
 
 	m.review.task = &t
 
@@ -213,4 +200,13 @@ func (t *aiTask) allExited() bool {
 		}
 	}
 	return true
+}
+
+func (t *aiTask) determineJobState(err error) jobState {
+	if errors.Is(err, review.ErrCancelled) || t.cancelling {
+		return jobCancelled
+	} else if err != nil {
+		return jobFailed
+	}
+	return jobDone
 }

@@ -28,7 +28,7 @@ var (
 	_ = review.JobSpec.Args
 	_ = review.ClaudeAvailable
 	_ = editor.Editor.CommandFiles
-	_ = renderDialog
+	_ = dialogView{}.Render
 	_ = formatElapsed
 	_ = overlayCenter
 	_ = jobState.String
