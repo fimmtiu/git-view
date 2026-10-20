@@ -54,10 +54,7 @@ const (
 // RepoLabel returns "📁 <repo-name> ⎇  <branch>", naming the repo from its
 // origin remote and falling back to the directory name.
 func RepoLabel(repoRoot string) string {
-	name := repoNameFromOrigin(repoRoot)
-	if name == "" {
-		name = filepath.Base(repoRoot)
-	}
+	name := RepoName(repoRoot)
 	label := repoIcon + name
 
 	if branch, err := Output(repoRoot, "branch", "--show-current"); err == nil && branch != "" {

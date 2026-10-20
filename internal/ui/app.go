@@ -13,6 +13,7 @@ import (
 	"github.com/fimmtiu/git-view/internal/diff"
 	"github.com/fimmtiu/git-view/internal/editor"
 	"github.com/fimmtiu/git-view/internal/git"
+	"github.com/fimmtiu/git-view/internal/review"
 )
 
 // Rows of chrome outside the content panes. Each status bar count includes its
@@ -35,6 +36,8 @@ type commitListMsg struct {
 	commits        []git.CommitEntry
 	forkPointIdx   int
 	hasUncommitted bool
+	branchChanges  bool
+	findingsExist  bool
 	err            string
 }
 
@@ -84,6 +87,8 @@ type Model struct {
 	// Recorded so the E key can explain itself rather than do nothing.
 	editorFound bool
 
+	review reviewState
+
 	// Sticky failure from loading commits or a diff.
 	errorMsg string
 
@@ -104,6 +109,7 @@ func NewModel(repoRoot, repoLabel string) Model {
 		refreshInterval: defaultRefreshInterval,
 		editor:          ed,
 		editorFound:     found,
+		review:          newReviewState(),
 	}
 }
 
@@ -120,10 +126,14 @@ func fetchCommitsCmd(repoRoot string) tea.Cmd {
 			return commitListMsg{forkPointIdx: -1, err: err.Error()}
 		}
 		hasUncommitted, _ := git.HasUncommittedChanges(repoRoot)
+		branchChanges, _ := git.HasBranchChanges(repoRoot)
+		findingsExist := review.FindingsExist(repoRoot)
 		return commitListMsg{
 			commits:        commits,
 			forkPointIdx:   git.ForkPointIndex(repoRoot, commits),
 			hasUncommitted: hasUncommitted,
+			branchChanges:  branchChanges,
+			findingsExist:  findingsExist,
 		}
 	}
 }
@@ -218,6 +228,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, afterChild(nil)
 		}
 		m.errorMsg = ""
+		m.review.hasBranchChanges = msg.branchChanges
+		m.review.findingsExist = msg.findingsExist
 		m.selector.setRows(buildCommitRows(msg.commits, msg.forkPointIdx, msg.hasUncommitted))
 		// A commit's stat never changes, but the working tree's can.
 		if m.selector.statHash == git.UncommittedHash {
@@ -241,6 +253,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case childExitedMsg:
 		return m, afterChild(nil)
+
+	case reviewStateMsg:
+		m.review.hasBranchChanges = msg.hasBranchChanges
+		m.review.findingsExist = msg.findingsExist
+		return m, nil
 
 	// The viewer does not show the commit list, and closing it reloads the list
 	// anyway, so the tick skips the fetch while the viewer is open.
@@ -269,6 +286,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case jobExitedMsg:
+		return m.handleJobExited(msg)
+
+	case dialogTickMsg:
+		return m.handleDialogTick(msg)
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -279,7 +302,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "ctrl+c" {
 		m.quitting = true
+		if m.review.task != nil {
+			m.cancelTask()
+		}
 		return m, tea.Quit
+	}
+
+	if m.review.task != nil || m.review.notice != nil {
+		return m.handleDialogKey(msg)
 	}
 
 	// The search prompt takes every printable key, so the letter bindings below
@@ -357,6 +387,10 @@ func (m Model) handleSelectorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.selector.extendRange(m.selector.listHeight, 1)
 	case "tab", "enter":
 		return m.openViewer()
+	case "C":
+		return m.startCodeReview()
+	case "F":
+		return m.startFix()
 	default:
 		return m, nil
 	}
@@ -386,6 +420,27 @@ func (m Model) openViewer() (tea.Model, tea.Cmd) {
 	return m, fetchDiffCmd(m.repoRoot, start, end)
 }
 
+// execEditor launches cmd using the appropriate method for the editor type.
+// For GUI editors, it starts the process in the background and returns a
+// command that waits for it. For terminal editors, it uses tea.ExecProcess
+// to suspend and restore the TUI.
+func (m Model) execEditor(cmd *exec.Cmd) tea.Cmd {
+	if m.editor.GUI {
+		if err := cmd.Start(); err != nil {
+			return statusCmd(fmt.Sprintf("editor failed: %s", err), true)
+		}
+		return waitForChildCmd(cmd)
+	}
+
+	// Terminal editor: use tea.ExecProcess to suspend and restore the TUI
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			return statusMsg{text: fmt.Sprintf("editor failed: %s", err), isErr: true}
+		}
+		return statusMsg{}
+	})
+}
+
 // openEditor targets the selected line, or the repository itself on the selector
 // screen where no file is in view. Terminal editors need the tty, so they run
 // through tea.ExecProcess, which suspends and restores the TUI around them.
@@ -404,18 +459,7 @@ func (m Model) openEditor() (tea.Model, tea.Cmd) {
 	}
 
 	cmd := m.editor.Command(m.repoRoot, target, line)
-	if m.editor.GUI {
-		if err := cmd.Start(); err != nil {
-			return m, statusCmd(fmt.Sprintf("editor failed: %s", err), true)
-		}
-		return m, waitForChildCmd(cmd)
-	}
-	return m, tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			return statusMsg{text: fmt.Sprintf("editor failed: %s", err), isErr: true}
-		}
-		return statusMsg{}
-	})
+	return m, m.execEditor(cmd)
 }
 
 func (m Model) openGitHub() (tea.Model, tea.Cmd) {
@@ -454,7 +498,7 @@ func (m Model) View() string {
 	} else {
 		bar = m.renderSelectorStatusBar(innerW)
 		panes = m.selector.renderPanes()
-		hints = m.selector.hintPairs()
+		hints = m.selector.hintPairs(m.reviewKeys())
 	}
 
 	statusBar := theme.StatusBarStyle.Width(innerW).Render(bar)
@@ -467,6 +511,12 @@ func (m Model) View() string {
 	hint := theme.HintBarStyle.Render(bottom)
 
 	full := lipgloss.JoinVertical(lipgloss.Left, statusBar, panes, hint)
+
+	if m.review.task != nil || m.review.notice != nil {
+		if v, ok := m.dialogView(); ok {
+			full = overlayCenter(full, v.Render(m.width), m.width, m.height)
+		}
+	}
 	if m.notifText != "" {
 		full = overlayBottomRight(full, theme.NotifStyle.Render(m.notifText), m.width, hintBarRows)
 	}

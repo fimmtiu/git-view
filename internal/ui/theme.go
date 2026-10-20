@@ -34,6 +34,11 @@ type Theme struct {
 	SearchMatchStyle  lipgloss.Style
 	SearchPromptStyle lipgloss.Style
 	SearchCursorStyle lipgloss.Style
+
+	// Dialogs.
+	DialogStyle       lipgloss.Style
+	DialogTitleStyle  lipgloss.Style
+	DialogButtonStyle lipgloss.Style
 }
 
 // Light values are tuned for white terminals (pastel backgrounds, dark
@@ -109,4 +114,9 @@ var theme = Theme{
 	SearchCursorStyle: lipgloss.NewStyle().
 		Background(colourAccent).
 		Foreground(colourOnAccent),
+
+	// Dialogs.
+	DialogStyle: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(colourBorder).Padding(1, 2),
+	DialogTitleStyle: lipgloss.NewStyle().Bold(true),
+	DialogButtonStyle: lipgloss.NewStyle().Background(colourPrimary).Foreground(colourOnPrimary).Padding(0, 1),
 }

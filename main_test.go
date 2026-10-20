@@ -2,6 +2,10 @@ package main
 
 import (
 	"os"
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/fimmtiu/git-view/internal/git"
+	"github.com/fimmtiu/git-view/internal/ui"
 	"path/filepath"
 	"testing"
 )
@@ -33,5 +37,26 @@ func TestCursorSequences_AreSaveAndRestore(t *testing.T) {
 	}
 	if restoreCursorSeq != "\x1b8" {
 		t.Errorf("restore = %q, want %q", restoreCursorSeq, "\x1b8")
+	}
+}
+
+func TestSmoke_ModelRunsOnThisRepository(t *testing.T) {
+	root, err := git.RepoRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m := ui.NewModel(root, git.RepoLabel(root))
+
+	if cmd := m.Init(); cmd == nil {
+		t.Error("Init() returned nil, want a command")
+	}
+
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = model.(ui.Model)
+
+	view := m.View()
+	if view == "" {
+		t.Error("View() returned empty string, want some output")
 	}
 }

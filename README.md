@@ -49,6 +49,28 @@ search mode.
 The term is matched exactly, so case counts. Only the text of the changed files is searched: the `@@` hunk headers, the
 file names, and the line-number gutter are part of the viewer rather than the files, and never match.
 
+## Code review
+
+Press `Shift`+`C` on the commit selector to run an adversarial code review. git-view runs two background
+`claude --print` jobs. One writes `.gv-review/code-review-findings.md` (Sonnet, high effort). The other writes
+`.gv-review/summary.md` (Opus 5.5, high effort). A "Code review" dialog shows each job's state and a timer. Press Enter
+or Escape to cancel. When both are done, git-view sends a terminal and an OS notification and opens both files in the
+editor.
+
+Press `Shift`+`F` to fix the findings. git-view runs one job (Opus 5.5, high effort) that fixes the issues, commits each
+fix, and appends a response section to the findings file. A "Fixing issues" dialog shows its state. When it is done,
+git-view notifies, reloads the commit list, and opens the findings file.
+
+The keys appear in the help text only when `claude` was on `PATH` at startup, the branch has commits that `main` or
+`master` does not, and no review or fix is running. `Shift`+`F` also needs the findings file.
+
+A code review needs a clean tree. Commit staged, unstaged, and untracked changes first.
+
+The jobs use your own Claude Code settings and permissions. git-view passes no permission flags, so the jobs must be
+allowed to write files. `Shift`+`F` must also be allowed to run `git commit`.
+
+Add `.gv-review/` to your global gitignore (`git config --global core.excludesFile`). git-view does not delete it.
+
 ## Keys
 
 | Key | Commit selector | Diff viewer |
@@ -62,6 +84,8 @@ file names, and the line-number gutter are part of the viewer rather than the fi
 | `/` | — | Search the diff |
 | `Esc` | — | Leave the search, line-select mode, or the viewer |
 | `c` / `C` | — | Collapse or expand one file / every file |
+| `Shift`+`C` | Run a code review | — |
+| `Shift`+`F` | Fix the review findings | — |
 | `E` | Open the repository in your editor | Open the current file, at the selected line |
 | `g` | — | Open the current file on GitHub |
 | `q` / `Ctrl-C` | Quit | Quit |

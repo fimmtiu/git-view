@@ -117,6 +117,17 @@ func baseName(cmd string) string {
 	return cmd
 }
 
+// ArgsWithoutLinePositioning returns Argv minus the command and line-positioning flags.
+func (e Editor) ArgsWithoutLinePositioning() []string {
+	args := make([]string, 0, len(e.Argv)-1)
+	for _, arg := range e.Argv[1:] {
+		if arg != "--goto" {
+			args = append(args, arg)
+		}
+	}
+	return args
+}
+
 // newCommand creates an exec.Cmd with the editor program and arguments,
 // setting the working directory for relative path resolution.
 func (e Editor) newCommand(dir string, args []string) *exec.Cmd {
