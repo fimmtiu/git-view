@@ -15,6 +15,10 @@ const (
 	FixJobName     = "Fixes"
 )
 
+// The review jobs and their sub-agents share one checkout at the same time, so
+// any change to the branch by one agent breaks the others.
+const branchStateRule = "IMPORTANT: Other agents are working in this same checkout at the same time. You MUST NOT change the state of the git branch: do NOT run `git checkout`, `git switch`, `git stash`, `git reset`, `git restore`, `git rebase`, `git merge`, `git pull`, `git cherry-pick`, or `git commit --amend`, and do NOT create, delete, or rename branches. Doing any of these will interfere with the other running agents. If you spawn sub-agents, include this rule in their instructions.\n"
+
 const reviewPromptTemplate = "Do an adversarial code review of the current branch. This is a read-only review; do NOT push to GitHub or modify existing commits.\n" +
 	"Base commit: <base>\n" +
 	"HEAD commit: <head>\n" +
@@ -98,7 +102,7 @@ const fixPromptText = "Read `.gv-review/code-review-findings.md` and fix all of 
 	"When all issues are fixed, append a new section to the bottom of that file which explains for each issue what you fixed, or why you pushed back.\n"
 
 func ReviewPrompt(base, head string) string {
-	s := reviewPromptTemplate
+	s := branchStateRule + "\n" + reviewPromptTemplate
 	s = strings.ReplaceAll(s, "<base>", base)
 	s = strings.ReplaceAll(s, "<head>", head)
 	s = strings.ReplaceAll(s, "<headsha>", head)
@@ -106,7 +110,7 @@ func ReviewPrompt(base, head string) string {
 }
 
 func SummaryPrompt() string {
-	return summaryPromptText
+	return branchStateRule + "\n" + summaryPromptText
 }
 
 func FixPrompt() string {

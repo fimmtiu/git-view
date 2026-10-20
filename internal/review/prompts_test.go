@@ -133,3 +133,14 @@ func TestFixJob(t *testing.T) {
 		t.Error("job.Prompt does not match FixPrompt()")
 	}
 }
+
+func TestReviewJobPromptsForbidChangesToBranchState(t *testing.T) {
+	for _, job := range ReviewJobs("base", "head") {
+		if !strings.HasPrefix(job.Prompt, branchStateRule) {
+			t.Errorf("%s prompt does not start with the branch-state rule", job.Name)
+		}
+	}
+	if strings.Contains(FixPrompt(), branchStateRule) {
+		t.Error("the fix prompt should be free to change the branch")
+	}
+}

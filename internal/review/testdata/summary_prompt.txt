@@ -1,3 +1,5 @@
+IMPORTANT: Other agents are working in this same checkout at the same time. You MUST NOT change the state of the git branch: do NOT run `git checkout`, `git switch`, `git stash`, `git reset`, `git restore`, `git rebase`, `git merge`, `git pull`, `git cherry-pick`, or `git commit --amend`, and do NOT create, delete, or rename branches. Doing any of these will interfere with the other running agents. If you spawn sub-agents, include this rule in their instructions.
+
 Generate a detailed Markdown summary of the code changes on this branch with the following sections:
 
 - Purpose
