@@ -53,7 +53,7 @@ func (m Model) startCodeReview() (tea.Model, tea.Cmd) {
 
 func finishReview(m Model, t *aiTask) (tea.Model, tea.Cmd) {
 	if t.cancelling {
-		return m, nil
+		return finishCancelledReview(m)
 	}
 
 	name := git.RepoName(m.repoRoot)
@@ -71,4 +71,16 @@ func finishReview(m Model, t *aiTask) (tea.Model, tea.Cmd) {
 		ShowOSNotification(text),
 		m.openInEditor(review.SummaryPath(m.repoRoot), review.FindingsPath(m.repoRoot)),
 	)
+}
+
+// finishCancelledReview opens whatever the review wrote before it was cancelled.
+// The review job writes partial findings as each sub-agent reports.
+func finishCancelledReview(m Model) (tea.Model, tea.Cmd) {
+	existing := review.ExistingOutputs(m.repoRoot)
+	if m.quitting || len(existing) == 0 {
+		return m, nil
+	}
+
+	m.review.findingsExist = review.FindingsExist(m.repoRoot)
+	return m, m.openInEditor(existing...)
 }

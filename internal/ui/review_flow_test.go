@@ -363,7 +363,76 @@ func TestFinishReview_MissingFiles(t *testing.T) {
 	}
 }
 
-// TestFinishReview_Cancelled verifies that a cancelled review does nothing.
+// cancelledReviewModel returns a model on a repo whose .gv-review holds the given files.
+func cancelledReviewModel(t *testing.T, files ...string) (Model, *aiTask) {
+	t.Helper()
+
+	dir := newBranchRepo(t)
+	reviewDir := filepath.Join(dir, ".gv-review")
+	os.MkdirAll(reviewDir, 0o755)
+	for _, f := range files {
+		os.WriteFile(filepath.Join(reviewDir, f), []byte("partial"), 0o644)
+	}
+
+	m := onSelector(t, 5, 100, 30)
+	m.repoRoot = dir
+	m.editorFound = false // So openInEditor returns a statusMsg we can check
+	m = withReviewState(m, &fakeStarter{}, false)
+
+	task := &aiTask{
+		id:         1,
+		title:      reviewDialogTitle,
+		jobs:       []taskJob{{name: review.ReviewJobName, state: jobCancelled, err: review.ErrCancelled}},
+		started:    fixedNow,
+		cancelling: true,
+	}
+	return m, task
+}
+
+func TestFinishReview_CancelledWithPartialFindings(t *testing.T) {
+	m, task := cancelledReviewModel(t, "code-review-findings.md")
+
+	updated, cmd := finishReview(m, task)
+	m = updated.(Model)
+
+	if cmd == nil {
+		t.Fatal("expected a command to open the partial findings")
+	}
+	if _, ok := findMsg[statusMsg](cmd); !ok {
+		t.Error("expected statusMsg from openInEditor (editorFound=false)")
+	}
+	if _, ok := findMsg[notifMsg](cmd); ok {
+		t.Error("cancelled review should not send notifications")
+	}
+	if !m.review.findingsExist {
+		t.Error("findingsExist should be true when partial findings exist")
+	}
+}
+
+func TestFinishReview_CancelledWithOnlySummary(t *testing.T) {
+	m, task := cancelledReviewModel(t, "summary.md")
+
+	updated, cmd := finishReview(m, task)
+	m = updated.(Model)
+
+	if _, ok := findMsg[statusMsg](cmd); !ok {
+		t.Error("expected statusMsg from openInEditor (editorFound=false)")
+	}
+	if m.review.findingsExist {
+		t.Error("findingsExist should be false when the findings file is missing")
+	}
+}
+
+func TestFinishReview_CancelledWhileQuitting(t *testing.T) {
+	m, task := cancelledReviewModel(t, "summary.md", "code-review-findings.md")
+	m.quitting = true
+
+	if _, cmd := finishReview(m, task); cmd != nil {
+		t.Error("a review cancelled by quitting should not open the editor")
+	}
+}
+
+// TestFinishReview_Cancelled verifies that a cancelled review with no output does nothing.
 func TestFinishReview_Cancelled(t *testing.T) {
 	// Disable terminal notifier for tests
 	oldHasTerminalNotifier := hasTerminalNotifier

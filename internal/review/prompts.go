@@ -65,10 +65,18 @@ const reviewPromptTemplate = "Do an adversarial code review of the current branc
 	"- For each candidate finding, argue against it: what would have to be true for this to actually be exploitable? If the preconditions are implausible or outside an attacker's control, discard it.\n" +
 	"\n" +
 	"### Testing\n" +
-	"- Are any important pieces of logic untested?\n" +
-	"- Would any tests fail if the code were reverted?\n" +
-	"- Are any of the pre-existing tests no longer relevant?\n" +
-	"- Are any of the tests brittle, or don't provide enough protection to be worthwhile?\n" +
+	"Work mainly by reading code. You may run at most 3 test commands, and each must target only the test files that cover the changed source files; never run the full suite. Do NOT do mutation testing, copy the repository, or modify any files to see whether tests fail; reason about it from the code instead.\n" +
+	"\n" +
+	"Prioritize, in this order, and stop when you run out of time:\n" +
+	"1. Changed logic that has branches or error paths with no test that exercises them.\n" +
+	"2. Changed behaviour whose existing tests would still pass if the change were reverted.\n" +
+	"3. Tests changed on this branch that are brittle (timing, ordering, over-mocking) or don't provide enough protection to be worthwhile.\n" +
+	"4. Pre-existing tests that the change made irrelevant.\n" +
+	"Skip anything outside the changed files and their direct callers.\n" +
+	"\n" +
+	"Time budget: 10 minutes. Run `date` when you start and record the time, then check `date` periodically. When the budget is used up, stop investigating and report what you have.\n" +
+	"\n" +
+	"Give each sub-agent the full text of its section above, including any limits, without paraphrasing it.\n" +
 	"\n" +
 	"Instructions for each sub-agent: \"Hunt adversarially. Try to break the code. VERIFY every candidate issue before including it. Cite file:line at the PR head, quote the code or prompt text, and drop anything you can't substantiate. Classify each finding as Blocker, Should Fix, or Nit based on severity. Each one gets a title, a file:line link (https://github.com/<owner>/<repo>/blob/<headsha>/path#Lnn), evidence, a concrete failing example where relevant, and a suggested fix.\"\n" +
 	"\n" +
@@ -76,7 +84,9 @@ const reviewPromptTemplate = "Do an adversarial code review of the current branc
 	"- Title, PR link (if any), head SHA, base SHA, today's date in `YYYY-MM-DD` format, and a one-line scope.\n" +
 	"- A one-line verdict, plus counts of Blockers / Should Fix / Nits.\n" +
 	"- Findings grouped by severity as Blockers, Should Fix, and Nits.\n" +
-	"Keep it tight. Do not put any model names in the file. If the file already exists, replace it — the pre-existing contents are no longer useful.\n"
+	"Keep it tight. Do not put any model names in the file. If the file already exists, replace it — the pre-existing contents are no longer useful.\n" +
+	"\n" +
+	"Do not wait for all sub-agents before you write the file. Each time a sub-agent reports, rewrite the file with all findings received so far, and put `Partial: waiting on <aspects>` under the title, listing the aspects that have not reported yet. When all six have reported, remove that line.\n"
 
 const summaryPromptText = "Generate a detailed Markdown summary of the code changes on this branch with the following sections:\n" +
 	"\n" +

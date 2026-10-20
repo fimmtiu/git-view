@@ -264,3 +264,49 @@ func TestMissingOutputs_OnlyFindingsExists(t *testing.T) {
 		t.Errorf("MissingOutputs(%q)[0] = %q, want %q", root, got[0], want[0])
 	}
 }
+
+func TestExistingOutputs_NoneExist(t *testing.T) {
+	root := t.TempDir()
+	
+	if got := ExistingOutputs(root); len(got) != 0 {
+		t.Errorf("ExistingOutputs(%q) = %v, want none", root, got)
+	}
+}
+
+func TestExistingOutputs_OnlyFindingsExists(t *testing.T) {
+	root := t.TempDir()
+	dirPath := filepath.Join(root, Dir)
+	
+	if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(FindingsPath(root), []byte("findings"), 0o644); err != nil {
+		t.Fatalf("Failed to create findings: %v", err)
+	}
+	
+	got := ExistingOutputs(root)
+	if len(got) != 1 || got[0] != FindingsPath(root) {
+		t.Errorf("ExistingOutputs(%q) = %v, want [%s]", root, got, FindingsPath(root))
+	}
+}
+
+func TestExistingOutputs_BothExist(t *testing.T) {
+	root := t.TempDir()
+	dirPath := filepath.Join(root, Dir)
+	
+	if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+	if err := os.WriteFile(SummaryPath(root), []byte("summary"), 0o644); err != nil {
+		t.Fatalf("Failed to create summary: %v", err)
+	}
+	if err := os.WriteFile(FindingsPath(root), []byte("findings"), 0o644); err != nil {
+		t.Fatalf("Failed to create findings: %v", err)
+	}
+	
+	got := ExistingOutputs(root)
+	want := []string{SummaryPath(root), FindingsPath(root)}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("ExistingOutputs(%q) = %v, want %v", root, got, want)
+	}
+}

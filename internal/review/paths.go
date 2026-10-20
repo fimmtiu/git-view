@@ -83,3 +83,17 @@ func MissingOutputs(repoRoot string) []string {
 	
 	return missing
 }
+
+// ExistingOutputs lists, as absolute paths and summary first, the outputs that exist.
+func ExistingOutputs(repoRoot string) []string {
+	var existing []string
+	
+	for _, filename := range outputFiles {
+		path := outputPath(repoRoot, filename)
+		if isRegularFile(path) {
+			existing = append(existing, path)
+		}
+	}
+	
+	return existing
+}
