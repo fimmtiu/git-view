@@ -17,7 +17,8 @@ const (
 // outputFiles is the list of output files created by review and fix jobs.
 var outputFiles = []string{SummaryFile, FindingsFile}
 
-// outputPath returns the absolute path for a named output file.
+// outputPath returns the absolute path for a named output file. repoRoot is the
+// root of the current worktree, so each worktree has its own Dir.
 func outputPath(repoRoot, filename string) string {
 	return filepath.Join(repoRoot, Dir, filename)
 }

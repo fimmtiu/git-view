@@ -36,6 +36,8 @@ func outputWithEnv(dir string, env []string, args ...string) (string, error) {
 }
 
 // RepoRoot returns the working tree's top level; diff paths are relative to it.
+// In a linked worktree this is the worktree's own root, not the main checkout's,
+// so per-checkout files such as .gv-review stay separate for each worktree.
 func RepoRoot(dir string) (string, error) {
 	root, err := Output(dir, "rev-parse", "--show-toplevel")
 	if err != nil {

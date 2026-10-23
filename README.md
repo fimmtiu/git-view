@@ -51,18 +51,17 @@ file names, and the line-number gutter are part of the viewer rather than the fi
 
 ## Code review
 
-Press `Shift`+`C` on the commit selector to run an adversarial code review. git-view runs two background
-`claude --print` jobs. One writes `.gv-review/code-review-findings.md` (Sonnet, high effort). The other writes
-`.gv-review/summary.md` (Opus 5.5, high effort). A "Code review" dialog shows each job's state and a timer. Press Enter
-or Escape to cancel. When both are done, git-view sends a terminal and an OS notification and opens both files in the
-editor.
+Press `Shift`+`C` on the commit selector to run an adversarial code review with Claude. It'll chug for a long time and
+then write two files to your worktree:
+* `.gv-review/code-review-findings.md`: a list of issues it found
+* `.gv-review/summary.md`: a summary of the changes introduced by this branch
 
-Press `Shift`+`F` to fix the findings. git-view runs one job (Opus 5.5, high effort) that fixes the issues, commits each
-fix, and appends a response section to the findings file. A "Fixing issues" dialog shows its state. When it is done,
-git-view notifies, reloads the commit list, and opens the findings file.
+Edit the `code-review-findings.md` file to delete anything you find unnecessary, then press `Shift`+`F` to fix the
+remaining findings. git-view runs a Claude job that fixes the issues, commits each fix, and appends a response section
+to the findings file.
 
-The keys appear in the help text only when `claude` was on `PATH` at startup, the branch has commits that `main` or
-`master` does not, and no review or fix is running. `Shift`+`F` also needs the findings file.
+These keys show up only when `claude` was on `$PATH` at startup, the branch has commits that `main` or `master` does not,
+and no review or fix is already running. Also, `Shift`+`F` only shows up if a findings file exists.
 
 A code review needs a clean tree. Commit staged, unstaged, and untracked changes first.
 
@@ -96,11 +95,7 @@ and `E` and `g` open it without a line number.
 ## Editor
 
 `E` uses the first of `$GIT_VIEW_EDITOR`, `$VISUAL`, or `$EDITOR` that is set,
-falling back to the first of `cursor`, `code`, or `zed` found on `PATH`.
-Line-number syntax is handled per editor (`--goto file:line` for VS Code-family
-editors, `+line file` for the vi family). GUI editors are launched in the
-background; terminal editors take over the screen and return to the viewer when
-they exit.
+falling back to the first of `cursor`, `code`, or `zed` found on `$PATH`.
 
 ## GitHub
 

@@ -64,6 +64,26 @@ func TestRepoRoot(t *testing.T) {
 	}
 }
 
+func TestRepoRoot_LinkedWorktree(t *testing.T) {
+	dir := newRepo(t)
+	worktree := filepath.Join(t.TempDir(), "feature")
+	run(t, dir, "worktree", "add", "-b", "feature", worktree)
+	sub := filepath.Join(worktree, "nested")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := RepoRoot(sub)
+	if err != nil {
+		t.Fatalf("RepoRoot: %v", err)
+	}
+	wantResolved, _ := filepath.EvalSymlinks(worktree)
+	gotResolved, _ := filepath.EvalSymlinks(root)
+	if gotResolved != wantResolved {
+		t.Errorf("RepoRoot = %q, want the worktree root %q", gotResolved, wantResolved)
+	}
+}
+
 func TestRepoRoot_NotARepo(t *testing.T) {
 	if _, err := RepoRoot(t.TempDir()); err == nil {
 		t.Error("expected an error outside a git repository")
