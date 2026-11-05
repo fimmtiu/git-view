@@ -49,10 +49,11 @@ Spawn a pool of six Sonnet sub-agents to examine each of the following aspects o
 Work mainly by reading code. You may run at most 3 test commands, and each must target only the test files that cover the changed source files; never run the full suite. Do NOT do mutation testing, copy the repository, or modify any files to see whether tests fail; reason about it from the code instead.
 
 Prioritize, in this order, and stop when you run out of time:
-1. Changed logic that has branches or error paths with no test that exercises them.
-2. Changed behaviour whose existing tests would still pass if the change were reverted.
-3. Tests changed on this branch that are brittle (timing, ordering, over-mocking) or don't provide enough protection to be worthwhile.
-4. Pre-existing tests that the change made irrelevant.
+1. Tests changed on this branch only to make them pass, while the bug that they found is still in the code. Examples: an expected value changed to match incorrect output, an assertion removed or made less strict, a test skipped or deleted, or an error that the test now ignores. For each changed assertion, decide from the code and the requirements if the new expected behaviour is correct. If it is not, report the bug that the old test found.
+2. Changed logic that has branches or error paths with no test that exercises them.
+3. Changed behaviour whose existing tests would still pass if the change were reverted.
+4. Tests changed on this branch that are brittle (timing, ordering, over-mocking) or don't provide enough protection to be worthwhile.
+5. Pre-existing tests that the change made irrelevant.
 Skip anything outside the changed files and their direct callers.
 
 Time budget: 10 minutes. Run `date` when you start and record the time, then check `date` periodically. When the budget is used up, stop investigating and report what you have.
@@ -70,6 +71,7 @@ Rate each finding on its impact on users and on the codebase if this branch merg
 - Nit: No effect on behaviour or maintainability. Examples: naming, wording, formatting, small cleanups.
 
 For testing findings:
+- A test changed to hide a bug gets the severity of the bug that it hides.
 - A changed branch or error path with no test is Should Fix.
 - It is a Blocker if the untested path also contains a suspected bug, or if a bug there could cause data loss or a security hole.
 - It is a Nit only if the path has no logic of its own (for example, it only logs a message).

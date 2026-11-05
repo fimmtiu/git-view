@@ -68,10 +68,11 @@ const reviewPromptTemplate = "Do an adversarial code review of the current branc
 	"Work mainly by reading code. You may run at most 3 test commands, and each must target only the test files that cover the changed source files; never run the full suite. Do NOT do mutation testing, copy the repository, or modify any files to see whether tests fail; reason about it from the code instead.\n" +
 	"\n" +
 	"Prioritize, in this order, and stop when you run out of time:\n" +
-	"1. Changed logic that has branches or error paths with no test that exercises them.\n" +
-	"2. Changed behaviour whose existing tests would still pass if the change were reverted.\n" +
-	"3. Tests changed on this branch that are brittle (timing, ordering, over-mocking) or don't provide enough protection to be worthwhile.\n" +
-	"4. Pre-existing tests that the change made irrelevant.\n" +
+	"1. Tests changed on this branch only to make them pass, while the bug that they found is still in the code. Examples: an expected value changed to match incorrect output, an assertion removed or made less strict, a test skipped or deleted, or an error that the test now ignores. For each changed assertion, decide from the code and the requirements if the new expected behaviour is correct. If it is not, report the bug that the old test found.\n" +
+	"2. Changed logic that has branches or error paths with no test that exercises them.\n" +
+	"3. Changed behaviour whose existing tests would still pass if the change were reverted.\n" +
+	"4. Tests changed on this branch that are brittle (timing, ordering, over-mocking) or don't provide enough protection to be worthwhile.\n" +
+	"5. Pre-existing tests that the change made irrelevant.\n" +
 	"Skip anything outside the changed files and their direct callers.\n" +
 	"\n" +
 	"Time budget: 10 minutes. Run `date` when you start and record the time, then check `date` periodically. When the budget is used up, stop investigating and report what you have.\n" +
@@ -89,6 +90,7 @@ const reviewPromptTemplate = "Do an adversarial code review of the current branc
 	"- Nit: No effect on behaviour or maintainability. Examples: naming, wording, formatting, small cleanups.\n" +
 	"\n" +
 	"For testing findings:\n" +
+	"- A test changed to hide a bug gets the severity of the bug that it hides.\n" +
 	"- A changed branch or error path with no test is Should Fix.\n" +
 	"- It is a Blocker if the untested path also contains a suspected bug, or if a bug there could cause data loss or a security hole.\n" +
 	"- It is a Nit only if the path has no logic of its own (for example, it only logs a message).\n" +
