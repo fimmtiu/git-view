@@ -78,13 +78,32 @@ const reviewPromptTemplate = "Do an adversarial code review of the current branc
 	"\n" +
 	"Give each sub-agent the full text of its section above, including any limits, without paraphrasing it.\n" +
 	"\n" +
-	"Instructions for each sub-agent: \"Hunt adversarially. Try to break the code. VERIFY every candidate issue before including it. Cite file:line at the PR head, quote the code or prompt text, and drop anything you can't substantiate. Classify each finding as Blocker, Should Fix, or Nit based on severity. Each one gets a title, a file:line link (https://github.com/<owner>/<repo>/blob/<headsha>/path#Lnn), evidence, a concrete failing example where relevant, and a suggested fix.\"\n" +
+	"Instructions for each sub-agent: \"Hunt adversarially. Try to break the code. VERIFY every candidate issue before including it. Cite file:line at the PR head, quote the code or prompt text, and drop anything you can't substantiate. Classify each finding with the severity rubric below, and include one sentence that explains why you chose that level. Each one gets a title, a file:line link (https://github.com/<owner>/<repo>/blob/<headsha>/path#Lnn), evidence, a concrete failing example where relevant, and a suggested fix.\"\n" +
+	"\n" +
+	"Give each sub-agent the full text of the severity rubric below, without paraphrasing it.\n" +
+	"\n" +
+	"### Severity rubric\n" +
+	"Rate each finding on its impact on users and on the codebase if this branch merges as it is now. Do not rate it on your confidence: if you cannot verify a finding, drop it; if you can verify it, rate it on its impact.\n" +
+	"- Blocker: Merging causes a real defect on a realistic path: incorrect results, data loss or corruption, a crash or hang, a security hole, a regression in existing behaviour, or a broken build or test suite. A design that will be expensive to undo once other code depends on it is also a Blocker. Ask: \"If this were my PR, would I refuse to merge it until this is fixed?\" If yes, it is a Blocker.\n" +
+	"- Should Fix: A real problem that does not cause a defect now, or causes one only on an unlikely path. Examples: missing error handling for a rare case, changed logic with no test, a misleading comment, a performance problem that does not matter at the current scale.\n" +
+	"- Nit: No effect on behaviour or maintainability. Examples: naming, wording, formatting, small cleanups.\n" +
+	"\n" +
+	"For testing findings:\n" +
+	"- A changed branch or error path with no test is Should Fix.\n" +
+	"- It is a Blocker if the untested path also contains a suspected bug, or if a bug there could cause data loss or a security hole.\n" +
+	"- It is a Nit only if the path has no logic of its own (for example, it only logs a message).\n" +
 	"\n" +
 	"Deliverable: write `.gv-review/code-review-findings.md` containing:\n" +
 	"- Title, PR link (if any), head SHA, base SHA, today's date in `YYYY-MM-DD` format, and a one-line scope.\n" +
 	"- A one-line verdict, plus counts of Blockers / Should Fix / Nits.\n" +
 	"- Findings grouped by severity as Blockers, Should Fix, and Nits.\n" +
 	"Keep it tight. Do not put any model names in the file. If the file already exists, replace it — the pre-existing contents are no longer useful.\n" +
+	"\n" +
+	"Before you write each version of the file, rate every finding again against the severity rubric. The sub-agents' ratings are only suggestions. Merge duplicate findings. Then derive the verdict from the ratings:\n" +
+	"- One or more Blockers: \"Do not merge.\"\n" +
+	"- No Blockers, but one or more Should Fix: \"Merge after fixes.\"\n" +
+	"- Only Nits, or no findings: \"OK to merge.\"\n" +
+	"If you think the branch must not merge but no finding is a Blocker, find the finding that causes your concern and make it a Blocker, or add it as a new finding.\n" +
 	"\n" +
 	"Do not wait for all sub-agents before you write the file. Each time a sub-agent reports, rewrite the file with all findings received so far, and put `Partial: waiting on <aspects>` under the title, listing the aspects that have not reported yet. When all six have reported, remove that line.\n"
 
