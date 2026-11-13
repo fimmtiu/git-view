@@ -15,7 +15,7 @@ import (
 
 func onSelector(t *testing.T, n, width, height int) Model {
 	t.Helper()
-	m, _ := NewModel("/tmp/repo", "📁 myrepo ⎇  main").
+	m, _ := NewModel("/tmp/repo", "📁 myrepo ⎇  main", "main").
 		Update(tea.WindowSizeMsg{Width: width, Height: height})
 	loaded, _ := m.(Model).Update(commitListMsg{commits: sampleCommits(n), forkPointIdx: -1})
 	return loaded.(Model)
@@ -37,7 +37,7 @@ func send(t *testing.T, m Model, k string) (Model, tea.Cmd) {
 // ── Startup ──────────────────────────────────────────────────────────────────
 
 func TestInit_LoadsTheCommitList(t *testing.T) {
-	cmd := NewModel("/tmp/repo", "📁 myrepo ⎇  main").Init()
+	cmd := NewModel("/tmp/repo", "📁 myrepo ⎇  main", "main").Init()
 	if cmd == nil {
 		t.Fatal("Init should start the commit-list fetch")
 	}
@@ -572,7 +572,7 @@ func TestStatusBar_LongMessagesDoNotChangeTheLayout(t *testing.T) {
 
 func TestStatusBar_LongRepoLabelDoesNotChangeTheLayout(t *testing.T) {
 	const width, height = 60, 20
-	m, _ := NewModel("/tmp/repo", "repo ("+strings.Repeat("long-branch-name-", 10)+")").
+	m, _ := NewModel("/tmp/repo", "repo ("+strings.Repeat("long-branch-name-", 10)+")", "main").
 		Update(tea.WindowSizeMsg{Width: width, Height: height})
 	loaded, _ := m.(Model).Update(commitListMsg{commits: sampleCommits(5), forkPointIdx: -1})
 
@@ -650,7 +650,7 @@ func TestNewModel_WithCustomStartJobFunc(t *testing.T) {
 		return nil, nil
 	}
 
-	m := NewModel("/tmp/repo", "test")
+	m := NewModel("/tmp/repo", "test", "main")
 	m.review.startJob = customStart
 
 	m.review.startJob("/tmp/repo", review.JobSpec{})
@@ -666,7 +666,7 @@ func TestNewModel_WithCustomTimeNowFunc(t *testing.T) {
 		return fixedTime
 	}
 
-	m := NewModel("/tmp/repo", "test")
+	m := NewModel("/tmp/repo", "test", "main")
 	m.review.now = customNow
 
 	got := m.review.now()

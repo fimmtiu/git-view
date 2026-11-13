@@ -34,7 +34,7 @@ func (m Model) startCodeReview() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	base, err := git.BranchBase(m.repoRoot)
+	base, err := git.BranchBase(m.repoRoot, m.baseRef)
 	if err != nil {
 		return m, gitErrorCmd(err)
 	}

@@ -87,6 +87,14 @@ func repoNameFromURL(url string) string {
 	return url
 }
 
+// VerifyCommit returns an error if ref does not name a commit.
+func VerifyCommit(repoRoot, ref string) error {
+	if _, err := Output(repoRoot, "rev-parse", "--verify", "--quiet", "--end-of-options", ref+"^{commit}"); err != nil {
+		return fmt.Errorf("%q is not a commit", ref)
+	}
+	return nil
+}
+
 func DetectDefaultBranch(repoRoot string) string {
 	if out, err := Output(repoRoot, "rev-parse", "--verify", "main"); err == nil && out != "" {
 		return "main"
@@ -117,12 +125,11 @@ func FetchCommitList(repoRoot string, maxCommits int) ([]CommitEntry, error) {
 	return commits, nil
 }
 
-// ForkPointIndex locates where the current branch diverged from the default
-// branch, or -1 if it is not in commits. merge-base is used rather than
-// --fork-point, which relies on the reflog and is unreliable in fresh clones.
-func ForkPointIndex(repoRoot string, commits []CommitEntry) int {
-	defaultBranch := DetectDefaultBranch(repoRoot)
-	forkHash, err := Output(repoRoot, "merge-base", defaultBranch, "HEAD")
+// ForkPointIndex locates where the current branch diverged from baseRef, or -1
+// if it is not in commits. merge-base is used rather than --fork-point, which
+// relies on the reflog and is unreliable in fresh clones.
+func ForkPointIndex(repoRoot, baseRef string, commits []CommitEntry) int {
+	forkHash, err := Output(repoRoot, "merge-base", baseRef, "HEAD")
 	if err != nil || forkHash == "" {
 		return -1
 	}

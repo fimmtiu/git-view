@@ -9,7 +9,7 @@ import (
 func TestBranchBase(t *testing.T) {
 	dir := newBranchRepo(t)
 	
-	base, err := BranchBase(dir)
+	base, err := BranchBase(dir, "main")
 	if err != nil {
 		t.Fatalf("BranchBase: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestBranchBase_OnDefaultBranch(t *testing.T) {
 	dir := newBranchRepo(t)
 	run(t, dir, "checkout", "main")
 	
-	base, err := BranchBase(dir)
+	base, err := BranchBase(dir, "main")
 	if err != nil {
 		t.Fatalf("BranchBase: %v", err)
 	}
@@ -45,6 +45,28 @@ func TestBranchBase_OnDefaultBranch(t *testing.T) {
 	}
 	if base != head {
 		t.Errorf("BranchBase on main = %q, want HEAD %q", base, head)
+	}
+}
+
+func TestBranchBase_UsesTheBaseRef(t *testing.T) {
+	dir := newBranchRepo(t)
+
+	base, err := BranchBase(dir, "feature")
+	if err != nil {
+		t.Fatalf("BranchBase: %v", err)
+	}
+	head, err := Output(dir, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatalf("rev-parse HEAD: %v", err)
+	}
+	if base != head {
+		t.Errorf("BranchBase against feature = %q, want HEAD %q", base, head)
+	}
+}
+
+func TestBranchBase_UnknownRef(t *testing.T) {
+	if _, err := BranchBase(newBranchRepo(t), "no-such-branch"); err == nil {
+		t.Error("BranchBase with an unknown ref: got nil error, want error")
 	}
 }
 
@@ -74,7 +96,7 @@ func TestHeadCommit(t *testing.T) {
 func TestHasBranchChanges_OnFeatureBranch(t *testing.T) {
 	dir := newBranchRepo(t)
 	
-	hasChanges, err := HasBranchChanges(dir)
+	hasChanges, err := HasBranchChanges(dir, "main")
 	if err != nil {
 		t.Fatalf("HasBranchChanges: %v", err)
 	}
@@ -88,7 +110,7 @@ func TestHasBranchChanges_OnDefaultBranch(t *testing.T) {
 	dir := newBranchRepo(t)
 	run(t, dir, "checkout", "main")
 	
-	hasChanges, err := HasBranchChanges(dir)
+	hasChanges, err := HasBranchChanges(dir, "main")
 	if err != nil {
 		t.Fatalf("HasBranchChanges: %v", err)
 	}
@@ -223,6 +245,18 @@ func TestRepoName_HTTPSOrigin(t *testing.T) {
 
 // newBranchRepo creates a clean repository with a "main" branch and a checked-out
 // "feature" branch one commit ahead of it, and returns its path.
+func TestHasBranchChanges_AgainstTheCurrentBranch(t *testing.T) {
+	dir := newBranchRepo(t)
+
+	hasChanges, err := HasBranchChanges(dir, "feature")
+	if err != nil {
+		t.Fatalf("HasBranchChanges: %v", err)
+	}
+	if hasChanges {
+		t.Error("HasBranchChanges against feature = true, want false")
+	}
+}
+
 func newBranchRepo(t *testing.T) string {
 	t.Helper()
 	dir := newRepo(t)

@@ -14,10 +14,12 @@ go build -o git-view .
 ## Usage
 
 ```
-git-view
+git-view [BASE]
 ```
 
-Run it inside a git repository. It takes no arguments.
+Run it inside a git repository. `BASE` is the ref that the current branch is compared against, for example `develop` or
+`origin/main`. If you do not give it, git-view uses `main`, or `master` if `main` does not exist. The base controls
+where the commit selector draws its fork-point rule, and which commits a code review examines.
 
 ## Commit selector
 
@@ -26,7 +28,7 @@ first, and the right pane shows `git show --stat` for whichever one the cursor i
 
 - Uncommitted changes appear at the top as `???? Uncommitted changes`. This covers modified tracked files and untracked
   ones, which show as new files. Ignored files and staged changes are left out.
-- A horizontal rule marks where the current branch diverged from `main` or `master`, separating your commits from the
+- A horizontal rule marks where the current branch diverged from the base ref, separating your commits from the
   ones you branched off.
 - Merge commits are omitted. Nobody likes you, merge commits. Go away.
 
@@ -60,7 +62,7 @@ Edit the `code-review-findings.md` file to delete anything you find unnecessary,
 remaining findings. git-view runs a Claude job that fixes the issues, commits each fix, and appends a response section
 to the findings file.
 
-These keys show up only when `claude` was on `$PATH` at startup, the branch has commits that `main` or `master` does not,
+These keys show up only when `claude` was on `$PATH` at startup, the branch has commits that the base ref does not,
 and no review or fix is already running. Also, `Shift`+`F` only shows up if a findings file exists.
 
 A code review needs a clean tree. Commit staged, unstaged, and untracked changes first.

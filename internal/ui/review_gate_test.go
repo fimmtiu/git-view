@@ -79,7 +79,7 @@ func TestReviewKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := NewModel("/tmp/test", "test")
+			m := NewModel("/tmp/test", "test", "main")
 			m.review.claudeFound = tt.claudeFound
 			m.review.hasBranchChanges = tt.hasBranchChanges
 			m.review.findingsExist = tt.findingsExist
@@ -190,7 +190,7 @@ func containsHint(view, key, desc string) bool {
 
 // TestCommitListMsg_SetsReviewState tests that commitListMsg updates review state.
 func TestCommitListMsg_SetsReviewState(t *testing.T) {
-	m := NewModel("/tmp/test", "test")
+	m := NewModel("/tmp/test", "test", "main")
 	m.review.claudeFound = true
 
 	// Success case - should set both fields
@@ -234,7 +234,7 @@ func TestFetchCommitsCmd_PopulatesFields(t *testing.T) {
 	repoPath := newBranchRepo(t)
 
 	// Should have branch changes (feature is ahead of main)
-	cmd := fetchCommitsCmd(repoPath)
+	cmd := fetchCommitsCmd(repoPath, "main")
 	msg := cmd()
 	commitMsg, ok := msg.(commitListMsg)
 	if !ok {
@@ -265,7 +265,7 @@ func TestFetchCommitsCmd_PopulatesFields(t *testing.T) {
 	}
 
 	// Should now report findings exist
-	cmd = fetchCommitsCmd(repoPath)
+	cmd = fetchCommitsCmd(repoPath, "main")
 	msg = cmd()
 	commitMsg, ok = msg.(commitListMsg)
 	if !ok {
@@ -286,7 +286,7 @@ func TestFetchCommitsCmd_PopulatesFields(t *testing.T) {
 	}
 	runGit("checkout", "main")
 
-	cmd = fetchCommitsCmd(repoPath)
+	cmd = fetchCommitsCmd(repoPath, "main")
 	msg = cmd()
 	commitMsg, ok = msg.(commitListMsg)
 	if !ok {

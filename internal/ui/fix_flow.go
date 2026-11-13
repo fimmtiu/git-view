@@ -27,7 +27,7 @@ func (m Model) startFix() (tea.Model, tea.Cmd) {
 }
 
 func finishFix(m Model, t *aiTask) (tea.Model, tea.Cmd) {
-	refresh := fetchCommitsCmd(m.repoRoot)
+	refresh := fetchCommitsCmd(m.repoRoot, m.baseRef)
 
 	// If cancelled, just refresh
 	if t.cancelling {

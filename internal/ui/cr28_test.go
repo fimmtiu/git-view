@@ -44,7 +44,7 @@ func TestCR28_reviewStateMsg_CarriesReviewState(t *testing.T) {
 // TestCR28_Model_HandlesReviewStateMsg verifies that the Model's Update method
 // handles reviewStateMsg to update review state.
 func TestCR28_Model_HandlesReviewStateMsg(t *testing.T) {
-	m := NewModel("/tmp/repo", "test")
+	m := NewModel("/tmp/repo", "test", "main")
 	m.review.hasBranchChanges = false
 	m.review.findingsExist = false
 
@@ -66,7 +66,7 @@ func TestCR28_Model_HandlesReviewStateMsg(t *testing.T) {
 // TestCR28_Model_Update_DoesNotSetReviewStateFromCommitList verifies that
 // after refactoring, receiving commitListMsg does not update review state.
 func TestCR28_Model_Update_DoesNotSetReviewStateFromCommitList(t *testing.T) {
-	m := NewModel("/tmp/repo", "test")
+	m := NewModel("/tmp/repo", "test", "main")
 	m.review.hasBranchChanges = false
 	m.review.findingsExist = false
 
@@ -91,7 +91,7 @@ func TestCR28_Model_Update_DoesNotSetReviewStateFromCommitList(t *testing.T) {
 // at startup rather than waiting for the first commit list load.
 func TestCR28_ReviewStateInitialization(t *testing.T) {
 	// After refactoring, Init() should return a command that fetches review state
-	m := NewModel("/tmp/repo", "test")
+	m := NewModel("/tmp/repo", "test", "main")
 	cmd := m.Init()
 
 	// Verify that Init returns a batch command that includes fetching review state

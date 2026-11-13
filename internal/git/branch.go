@@ -6,10 +6,9 @@ import (
 	"strconv"
 )
 
-// BranchBase returns the full SHA of the merge base of the default branch and HEAD.
-func BranchBase(repoRoot string) (string, error) {
-	defaultBranch := DetectDefaultBranch(repoRoot)
-	base, err := Output(repoRoot, "merge-base", defaultBranch, "HEAD")
+// BranchBase returns the full SHA of the merge base of baseRef and HEAD.
+func BranchBase(repoRoot, baseRef string) (string, error) {
+	base, err := Output(repoRoot, "merge-base", baseRef, "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("cannot find the branch base: %w", err)
 	}
@@ -26,8 +25,8 @@ func HeadCommit(repoRoot string) (string, error) {
 }
 
 // HasBranchChanges reports whether HEAD has at least one commit that BranchBase does not.
-func HasBranchChanges(repoRoot string) (bool, error) {
-	base, err := BranchBase(repoRoot)
+func HasBranchChanges(repoRoot, baseRef string) (bool, error) {
+	base, err := BranchBase(repoRoot, baseRef)
 	if err != nil {
 		return false, err
 	}

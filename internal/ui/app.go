@@ -74,6 +74,7 @@ type Model struct {
 
 	repoRoot  string
 	repoLabel string
+	baseRef   string // the branch is compared against this ref
 
 	selector selector
 	viewer   *viewer
@@ -101,11 +102,12 @@ type Model struct {
 	quitting bool
 }
 
-func NewModel(repoRoot, repoLabel string) Model {
+func NewModel(repoRoot, repoLabel, baseRef string) Model {
 	ed, found := editor.Resolve()
 	return Model{
 		repoRoot:        repoRoot,
 		repoLabel:       repoLabel,
+		baseRef:         baseRef,
 		refreshInterval: defaultRefreshInterval,
 		editor:          ed,
 		editorFound:     found,
@@ -114,23 +116,23 @@ func NewModel(repoRoot, repoLabel string) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(fetchCommitsCmd(m.repoRoot), refreshTickCmd(m.refreshInterval))
+	return tea.Batch(fetchCommitsCmd(m.repoRoot, m.baseRef), refreshTickCmd(m.refreshInterval))
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-func fetchCommitsCmd(repoRoot string) tea.Cmd {
+func fetchCommitsCmd(repoRoot, baseRef string) tea.Cmd {
 	return func() tea.Msg {
 		commits, err := git.FetchCommitList(repoRoot, maxCommits)
 		if err != nil {
 			return commitListMsg{forkPointIdx: -1, err: err.Error()}
 		}
 		hasUncommitted, _ := git.HasUncommittedChanges(repoRoot)
-		branchChanges, _ := git.HasBranchChanges(repoRoot)
+		branchChanges, _ := git.HasBranchChanges(repoRoot, baseRef)
 		findingsExist := review.FindingsExist(repoRoot)
 		return commitListMsg{
 			commits:        commits,
-			forkPointIdx:   git.ForkPointIndex(repoRoot, commits),
+			forkPointIdx:   git.ForkPointIndex(repoRoot, baseRef, commits),
 			hasUncommitted: hasUncommitted,
 			branchChanges:  branchChanges,
 			findingsExist:  findingsExist,
@@ -265,7 +267,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.viewer != nil {
 			return m, refreshTickCmd(m.refreshInterval)
 		}
-		return m, tea.Batch(fetchCommitsCmd(m.repoRoot), refreshTickCmd(m.refreshInterval))
+		return m, tea.Batch(fetchCommitsCmd(m.repoRoot, m.baseRef), refreshTickCmd(m.refreshInterval))
 
 	case statusMsg:
 		m.status = msg.text
@@ -342,7 +344,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleViewerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if isViewerExitKey(m.viewer, msg) {
 		m.viewer = nil
-		return m, fetchCommitsCmd(m.repoRoot)
+		return m, fetchCommitsCmd(m.repoRoot, m.baseRef)
 	}
 	m.viewer.handleKey(msg)
 	return m, nil

@@ -7,6 +7,7 @@ import (
 	"github.com/fimmtiu/git-view/internal/git"
 	"github.com/fimmtiu/git-view/internal/ui"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -40,13 +41,44 @@ func TestCursorSequences_AreSaveAndRestore(t *testing.T) {
 	}
 }
 
+func TestParseArgs(t *testing.T) {
+	tests := []struct {
+		args     []string
+		baseRef  string
+		help     bool
+		wantsErr bool
+	}{
+		{nil, "", false, false},
+		{[]string{"develop"}, "develop", false, false},
+		{[]string{"origin/main"}, "origin/main", false, false},
+		{[]string{"-h"}, "", true, false},
+		{[]string{"--help"}, "", true, false},
+		{[]string{"--base"}, "", false, true},
+		{[]string{"develop", "extra"}, "", false, true},
+	}
+	for _, tt := range tests {
+		baseRef, help, err := parseArgs(tt.args)
+		if baseRef != tt.baseRef || help != tt.help || (err != nil) != tt.wantsErr {
+			t.Errorf("parseArgs(%q) = %q, %v, %v; want %q, %v, error %v",
+				tt.args, baseRef, help, err, tt.baseRef, tt.help, tt.wantsErr)
+		}
+	}
+}
+
+func TestRun_RejectsABaseRefThatIsNotACommit(t *testing.T) {
+	err := run([]string{"no-such-branch-for-git-view"})
+	if err == nil || !strings.Contains(err.Error(), "is not a commit") {
+		t.Errorf("run = %v, want a \"not a commit\" error", err)
+	}
+}
+
 func TestSmoke_ModelRunsOnThisRepository(t *testing.T) {
 	root, err := git.RepoRoot(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	m := ui.NewModel(root, git.RepoLabel(root))
+	m := ui.NewModel(root, git.RepoLabel(root), git.DetectDefaultBranch(root))
 
 	if cmd := m.Init(); cmd == nil {
 		t.Error("Init() returned nil, want a command")

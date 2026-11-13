@@ -174,7 +174,7 @@ func TestForkPointIndex_OnABranch(t *testing.T) {
 
 	list := commits(t, dir)
 	// [feature commit, second commit, first commit]; the branch forked at index 1.
-	if got := ForkPointIndex(dir, list); got != 1 {
+	if got := ForkPointIndex(dir, "main", list); got != 1 {
 		t.Errorf("ForkPointIndex = %d, want 1 (%q)", got, list[1].Message)
 	}
 }
@@ -183,8 +183,17 @@ func TestForkPointIndex_OnTheDefaultBranch(t *testing.T) {
 	dir := newRepo(t)
 
 	// On main, the merge base with main is HEAD itself.
-	if got := ForkPointIndex(dir, commits(t, dir)); got != 0 {
+	if got := ForkPointIndex(dir, "main", commits(t, dir)); got != 0 {
 		t.Errorf("ForkPointIndex = %d, want 0", got)
+	}
+}
+
+func TestForkPointIndex_UsesTheBaseRef(t *testing.T) {
+	dir := newRepo(t)
+
+	// [second commit, first commit]; the branch forks from HEAD~1, not main.
+	if got := ForkPointIndex(dir, "HEAD~1", commits(t, dir)); got != 1 {
+		t.Errorf("ForkPointIndex = %d, want 1", got)
 	}
 }
 
@@ -197,7 +206,7 @@ func TestForkPointIndex_ForkPointOutsideTheList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := ForkPointIndex(dir, list); got != 0 && got != -1 {
+	if got := ForkPointIndex(dir, "main", list); got != 0 && got != -1 {
 		t.Errorf("ForkPointIndex = %d, want 0 or -1 when the fork point is out of range", got)
 	}
 }
@@ -537,6 +546,20 @@ func TestRepoNameFromURL(t *testing.T) {
 func TestDetectDefaultBranch(t *testing.T) {
 	if got := DetectDefaultBranch(newRepo(t)); got != "main" {
 		t.Errorf("DetectDefaultBranch = %q, want main", got)
+	}
+}
+
+func TestVerifyCommit(t *testing.T) {
+	dir := newRepo(t)
+	for _, ref := range []string{"main", "HEAD~1"} {
+		if err := VerifyCommit(dir, ref); err != nil {
+			t.Errorf("VerifyCommit(%q) = %v, want nil", ref, err)
+		}
+	}
+	for _, ref := range []string{"no-such-branch", "HEAD~99", "-x"} {
+		if err := VerifyCommit(dir, ref); err == nil {
+			t.Errorf("VerifyCommit(%q) = nil, want an error", ref)
+		}
 	}
 }
 

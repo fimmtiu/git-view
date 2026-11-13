@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -14,10 +15,13 @@ import (
 const usage = `git-view — a full-screen terminal viewer for git diffs
 
 Usage:
-  git-view
+  git-view [BASE]
 
 Run it inside a git repository. It opens on a commit selector; pick a commit
 or a range and press Tab or Enter to view the diff.
+
+BASE is the ref that the current branch is compared against. If you do not
+give it, git-view uses main, or master if main does not exist.
 
 Environment:
   GIT_VIEW_EDITOR, VISUAL, EDITOR   editor launched by the E key
@@ -31,12 +35,10 @@ func main() {
 }
 
 func run(args []string) error {
-	if len(args) > 0 {
+	baseRef, help, err := parseArgs(args)
+	if help || err != nil {
 		fmt.Print(usage)
-		if args[0] != "-h" && args[0] != "--help" {
-			return fmt.Errorf("unexpected argument %q", args[0])
-		}
-		return nil
+		return err
 	}
 
 	cwd, err := os.Getwd()
@@ -48,11 +50,33 @@ func run(args []string) error {
 		return err
 	}
 
-	model := ui.NewModel(repoRoot, git.RepoLabel(repoRoot))
+	if baseRef == "" {
+		baseRef = git.DetectDefaultBranch(repoRoot)
+	} else if err := git.VerifyCommit(repoRoot, baseRef); err != nil {
+		return err
+	}
+
+	model := ui.NewModel(repoRoot, git.RepoLabel(repoRoot), baseRef)
 	restoreCursorPos := saveCursorPos(os.Stdout)
 	_, err = tea.NewProgram(model, tea.WithAltScreen()).Run()
 	restoreCursorPos()
 	return err
+}
+
+// parseArgs returns the base ref, or "" if there is none, and whether the user
+// asked for help.
+func parseArgs(args []string) (baseRef string, help bool, err error) {
+	switch {
+	case len(args) == 0:
+		return "", false, nil
+	case args[0] == "-h" || args[0] == "--help":
+		return "", true, nil
+	case strings.HasPrefix(args[0], "-"):
+		return "", false, fmt.Errorf("unknown option %q", args[0])
+	case len(args) > 1:
+		return "", false, fmt.Errorf("unexpected argument %q", args[1])
+	}
+	return args[0], false, nil
 }
 
 // DECSC and DECRC: save the cursor position, then put the cursor back.
